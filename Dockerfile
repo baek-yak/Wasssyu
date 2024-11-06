@@ -18,6 +18,9 @@ RUN conda create -n fastapi_env python=3.9.20 -y && \
 # SHELL 명령어를 통해 환경 활성화 설정
 SHELL ["conda", "run", "-n", "fastapi_env", "/bin/bash", "-c"]
 
+# PYTHONPATH 설정으로 fast_api를 루트로 추가
+ENV PYTHONPATH=/app/backend/fast_api
+
 # /app/backend/requirements.txt 파일을 사용하여 필요한 패키지 설치
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
