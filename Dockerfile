@@ -22,4 +22,4 @@ SHELL ["conda", "run", "-n", "fastapi_env", "/bin/bash", "-c"]
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 # FastAPI 애플리케이션 실행 명령어
-CMD ["conda", "run", "-n", "fastapi_env", "uvicorn", "backend.fastapi.main:app", "--host", "0.0.0.0"]
+CMD ["conda", "run", "-n", "fastapi_env", "uvicorn", "app.backend.fastapi.main:app", "--host", "0.0.0.0"]
