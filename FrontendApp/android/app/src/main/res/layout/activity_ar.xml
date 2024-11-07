@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- 카메라 프리뷰 영역 -->
+    <SurfaceView
+        android:id="@+id/cameraPreview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- 카메라 화면 위에 표시할 오버레이 이미지 -->
+    <ImageView
+        android:id="@+id/arOverlayImage"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_centerInParent="true"
+        android:src="@drawable/your_image"
+        android:contentDescription="AR 오버레이 이미지" />
+</RelativeLayout>

@@ -80,11 +80,14 @@ android {
     namespace "com.frontendapp"
     defaultConfig {
         applicationId "com.frontendapp"
-        minSdkVersion rootProject.ext.minSdkVersion
+
+        // ARCore는 Android 7.0(API 24) 이상을 요구하므로 minSdkVersion을 24로 설정합니다.
+        minSdkVersion 24
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
     }
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -93,6 +96,7 @@ android {
             keyPassword 'android'
         }
     }
+
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
@@ -116,4 +120,7 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // ARCore 라이브러리를 추가하여 AR 기능을 활성화합니다.
+    implementation 'com.google.ar:core:1.33.0'
 }
