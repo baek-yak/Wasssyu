@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="Gradle: com.typesafe.netty:netty-reactive-streams-http:2.0.5" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="com.typesafe.netty" artifactId="netty-reactive-streams-http" version="2.0.5" />
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.typesafe.netty/netty-reactive-streams-http/2.0.5/5148eda52181bf504eaf61015f6cf0f39ea22136/netty-reactive-streams-http-2.0.5.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
