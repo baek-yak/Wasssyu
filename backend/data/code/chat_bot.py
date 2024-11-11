@@ -1,13 +1,11 @@
 import pandas as pd
 import os
 from sklearn.metrics.pairwise import cosine_similarity
-from langchain.embeddings.openai import OpenAIEmbeddings
 import numpy as np
 from openai import OpenAI
 
 # OpenAI API 설정
 API_KEY = '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'
-
 client = OpenAI(api_key=API_KEY)
 
 # 데이터 로드 함수
@@ -46,22 +44,33 @@ def handle_info_request(user_input, data):
 # 코스 추천 처리
 def handle_course_recommendation(user_input, data, filters=None):
     """코스 추천 처리 함수"""
-    embeddings = client.embeddings.create(
-      input= user_input,
-      model="text-embedding-3-large"
+    # 데이터의 임베딩 텍스트 준비
+    data['embedding_text'] = data['name'] + " " + data['종류'] + " " + data['address']
+    
+    # 사용자 입력의 임베딩 생성
+    user_embedding_response = client.embeddings.create(
+        input=user_input,
+        model="text-embedding-3-large"
     )
-    user_embedding = embeddings.data[0].embedding
+    user_embedding = user_embedding_response.data[0].embedding
 
-    # 데이터의 임베딩 추출
-    data['embedding'] = data['name'] + " " + data['종류'] + " " + data['address']
-    travel_embeddings = data['embedding'].apply(embeddings.embed_query).to_list()
-    travel_embeddings = np.stack(travel_embeddings)
+    # 데이터의 임베딩 생성
+    embedding_responses = [
+        client.embeddings.create(
+            input=text,
+            model="text-embedding-3-large"
+        ).data[0].embedding
+        for text in data['embedding_text']
+    ]
+    
+    # 임베딩을 numpy 배열로 변환
+    travel_embeddings = np.array(embedding_responses)
 
     # 코사인 유사도 계산
     similarities = cosine_similarity([user_embedding], travel_embeddings)[0]
     data['similarity'] = similarities
 
-    # 필터 적용 (평점, 리뷰수 기준)
+    # 필터 적용
     if filters:
         if 'min_rating' in filters:
             data = data[data['rating'] >= filters['min_rating']]
@@ -84,7 +93,7 @@ def generate_natural_response(user_input, action, result):
     """
     try:
         completion = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o",  # 모델명 수정
             messages=[
                 {"role": "system", "content": "당신은 여행 정보 및 추천을 제공하는 전문 챗봇입니다."},
                 {"role": "user", "content": prompt}
@@ -92,8 +101,7 @@ def generate_natural_response(user_input, action, result):
             max_tokens=300,
             temperature=0.7
         )
-        response = completion.choices[0].message.content
-        return response
+        return completion.choices[0].message.content
     except Exception as e:
         print(f"OpenAI API 호출 중 오류가 발생했습니다: {e}")
         return "죄송합니다. 요청을 처리하는 중 문제가 발생했습니다."
@@ -113,13 +121,11 @@ def process_user_input(user_input, data):
         if "리뷰 많은" in user_input:
             filters['min_reviews'] = 100
         result = handle_course_recommendation(user_input, data, filters)
-        result = result.to_string(index=False)  # 추천 결과를 문자열로 변환
+        result = result.to_string(index=False)
     else:
         result = "입력을 이해하지 못했습니다. 다시 시도해주세요."
 
-    # OpenAI를 사용해 자연스러운 응답 생성
-    response = generate_natural_response(user_input, action, result)
-    return response
+    return generate_natural_response(user_input, action, result)
 
 # 사용자 입력 분류
 def classify_input(user_input):
@@ -136,7 +142,7 @@ def classify_input(user_input):
 
 # 메인 실행
 def main():
-    data_directory = r"C:\Users\SSAFY\MCL\S11P31B105\backend\data\csv_files\my_datas"
+    data_directory = r"/Users/gangbyeong-gyu/VSCodeProjects/ML/S11P31B105/backend/data/csv_files/my_datas"
     data = load_data_from_directory(data_directory)
 
     print("챗봇을 시작합니다. 질문 또는 요청을 입력하세요.")
@@ -149,6 +155,5 @@ def main():
         response = process_user_input(user_input, data)
         print(f"\n응답: {response}")
 
-# 실행
 if __name__ == "__main__":
     main()
