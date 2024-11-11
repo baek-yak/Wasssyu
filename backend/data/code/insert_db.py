@@ -12,10 +12,8 @@ DB_CONFIG = {
     "port": 5444,
 }
 
-# 데이터가 저장된 디렉토리 경로
-DATA_DIR = "/Users/gangbyeong-gyu/VSCodeProjects/ML/S11P31B105/backend/data/csv_files/my_datas"
+DATA_DIR = r"C:\Users\SSAFY\MCL\S11P31B105\backend\data\csv_files\my_datas"
 
-# 테이블 이름 매핑
 FILE_TABLE_MAP = {
     "대전_과학명소.csv": "science_sites",
     "대전_맛집.csv": "restaurants",
@@ -26,7 +24,6 @@ FILE_TABLE_MAP = {
     "대전시_대표명소.csv": "main_sites",
 }
 
-# 데이터베이스 연결
 def connect_to_db():
     try:
         conn = psycopg2.connect(**DB_CONFIG)
@@ -36,7 +33,6 @@ def connect_to_db():
         print(f"Error connecting to the database: {e}")
         return None
 
-# 테이블 생성
 def create_table(cursor, table_name, columns):
     try:
         column_definitions = ", ".join(
@@ -50,7 +46,6 @@ def create_table(cursor, table_name, columns):
     except Exception as e:
         print(f"Error creating table '{table_name}': {e}")
 
-# 데이터 삽입
 def insert_data(cursor, table_name, df):
     try:
         columns = df.columns.tolist()
@@ -63,7 +58,6 @@ def insert_data(cursor, table_name, df):
     except Exception as e:
         print(f"Error inserting data into table '{table_name}': {e}")
 
-# 파일 처리 및 데이터 업로드
 def process_and_upload_files():
     conn = connect_to_db()
     if conn is None:
@@ -81,7 +75,6 @@ def process_and_upload_files():
                 print(f"\nProcessing file: {file_name}")
                 
                 try:
-                    # 데이터 읽기
                     df = pd.read_csv(file_path, encoding="utf-8-sig")
                     print(f"File '{file_name}' read successfully with {len(df)} rows.")
                 except Exception as e:
@@ -89,7 +82,6 @@ def process_and_upload_files():
                     continue
 
                 try:
-                    # 컬럼명 정리
                     df.rename(
                         columns={
                             "종류": "category",
@@ -98,18 +90,25 @@ def process_and_upload_files():
                         },
                         inplace=True,
                     )
-                    df.columns = df.columns.str.lower().str.replace(" ", "_")  # 컬럼명 표준화
+                    df.columns = df.columns.str.lower().str.replace(" ", "_")
+
+                    # NaN 값을 None으로 변환
+                    df = df.where(pd.notnull(df), None)
+
+                    # 숫자 컬럼 강제 변환 및 재할당
+                    if "review_count" in df.columns:
+                        df["review_count"] = pd.to_numeric(df["review_count"], errors="coerce")
+                        df["review_count"] = df["review_count"].fillna(0)
                 except Exception as e:
-                    print(f"Error renaming columns in file '{file_name}': {e}")
+                    print(f"Error processing columns in file '{file_name}': {e}")
                     continue
 
-                # 테이블 생성
                 column_types = {
                     "name": "TEXT",
                     "category": "TEXT",
                     "address": "TEXT",
                     "rating": "REAL",
-                    "review_count": "INT",
+                    "review_count": "BIGINT",
                     "phone": "TEXT",
                     "business_hours": "TEXT",
                     "latitude": "REAL",
@@ -118,7 +117,6 @@ def process_and_upload_files():
                 }
                 create_table(cursor, table_name, column_types)
 
-                # 데이터 삽입
                 try:
                     insert_data(cursor, table_name, df)
                     conn.commit()
