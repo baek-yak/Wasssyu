@@ -9,8 +9,8 @@ app = FastAPI(docs_url="/fast_api/docs",
 
 # 라우터 연결
 app.include_router(recommendation_router, prefix="/fast_api")
-app.include_router(bakeryrouter, prefix='/bakery')
-app.include_router(chat_router, prefix='/chat')
+app.include_router(bakeryrouter, prefix='/fast_api')
+app.include_router(chat_router, prefix='/fast_api')
 
 # 기본 엔드포인트
 @app.get("/")
