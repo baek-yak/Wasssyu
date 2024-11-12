@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 from routers.recommendation import recommendation_router
 from routers.bakeryrouter import bakeryrouter
 from routers.chat_router import chat_router
@@ -7,6 +8,14 @@ from routers.bakeries_router import bakeries_router
 
 app = FastAPI(docs_url="/fast_api/docs",
               openapi_url="/fast_api/openapi.json")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins = ["*"], # 모든 출처 허용
+    allow_credentials = True,
+    allow_methods = ["*"], # 모든 HTTP 메서드 허용
+    allow_headers = ["*"], # 모든 헤더 허용
+)
 
 # 라우터 연결
 app.include_router(recommendation_router, prefix="/fast_api")
