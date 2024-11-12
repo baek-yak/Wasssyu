@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers.recommendation import recommendation_router
 from routers.bakeryrouter import bakeryrouter
 from routers.chat_router import chat_router
-from routers.bakeries_router import bakeries_router
+from routers.course_router import course_router
 
 app = FastAPI(docs_url="/fast_api/docs",
               openapi_url="/fast_api/openapi.json")
@@ -21,7 +21,7 @@ app.add_middleware(
 app.include_router(recommendation_router, prefix="/fast_api")
 app.include_router(bakeryrouter, prefix='/fast_api')
 app.include_router(chat_router, prefix='/fast_api')
-app.include_router(bakeries_router, prefix='/fast_api')
+app.include_router(course_router, prefix='/fast_api')
 
 # 기본 엔드포인트
 @app.get("/")
