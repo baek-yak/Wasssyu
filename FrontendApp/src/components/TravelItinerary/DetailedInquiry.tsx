@@ -125,7 +125,7 @@ const DetailedInquiry = () => {
 
   const handleUpdateSchedule = async () => {
     if (!scheduleId) {
-      Alert.alert('오류', '유효한 일정 ID가 없습니다.');
+      Alert.alert('오류!', '유효한 일정 ID가 없습니다.');
       return;
     }
 
