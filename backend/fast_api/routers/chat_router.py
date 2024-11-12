@@ -1,3 +1,4 @@
+from fastapi import APIRouter, HTTPException
 import psycopg2
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
@@ -16,6 +17,9 @@ DB_CONFIG = {
     "host": "k11b105.p.ssafy.io",
     "port": 5444,
 }
+
+# 라우터 생성
+chat_router = APIRouter()
 
 # PostgreSQL에서 데이터 로드
 def load_all_data():
@@ -159,18 +163,12 @@ def classify_input(user_input):
     else:
         return "알 수 없음"
 
-# 메인 실행
-def main():
-    data = load_all_data()  # 모든 테이블 데이터 로드
-    print("챗봇을 시작합니다. 질문 또는 요청을 입력하세요.")
-    while True:
-        user_input = input("\n사용자 입력: ")
-        if user_input.lower() in ["종료", "exit", "quit"]:
-            print("챗봇을 종료합니다.")
-            break
-
-        response = process_user_input(user_input, data)
-        print(f"\n응답: {response}")
-
-if __name__ == "__main__":
-    main()
+# FastAPI 라우터 엔드포인트 정의
+@chat_router.post("/chat")
+async def chat_with_bot(user_input: str):
+    """사용자의 입력에 응답"""
+    data = load_all_data()
+    if data.empty:
+        raise HTTPException(status_code=500, detail="데이터 로드 실패")
+    response = process_user_input(user_input, data)
+    return {"response": response}
