@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException
 import psycopg2
 import pandas as pd
-from typing import List
 
 # PostgreSQL DB 설정
 DB_CONFIG = {
@@ -13,68 +12,75 @@ DB_CONFIG = {
 }
 
 # 라우터 생성
-bakeries_router = APIRouter()
+course_router = APIRouter()
 
-# PostgreSQL에서 데이터 로드 함수
-def fetch_bakeries_info_with_images(names: List[str]):
-    """
-    tourist_spot_entity, breadmon_entity, tourist_spot_image_entity 테이블을 기반으로
-    빵집 정보를 조회하며 연결된 모든 이미지를 반환
-    """
+# 데이터베이스 연결 함수
+def fetch_data(query, params=None):
+    """데이터베이스에서 데이터를 조회하는 함수"""
     try:
         conn = psycopg2.connect(**DB_CONFIG)
-        placeholders = ', '.join(['%s'] * len(names))
-        query = f"""
-            SELECT 
-                tse.spot_name AS name, 
-                tse.spot_address AS address, 
-                tse.rating, 
-                tse.favorites_count AS review_count, 
-                tse.phone, 
-                tse.business_hours, 
-                tse.spot_description AS description, 
-                ARRAY_AGG(DISTINCT COALESCE(be.mon_image_url, tsie.tourist_spot_image_url)) AS image_urls
-            FROM tourist_spot_entity AS tse
-            LEFT JOIN breadmon_entity AS be
-            ON tse.id = be.bakery_temp_id
-            LEFT JOIN tourist_spot_image_entity AS tsie
-            ON tse.id = tsie.tourist_spot_entity_id
-            WHERE tse.spot_name IN ({placeholders})
-            GROUP BY tse.id
-        """
-        data = pd.read_sql_query(query, conn, params=names)
+        data = pd.read_sql_query(query, conn, params=params)
         conn.close()
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
-# 엔드포인트 정의
-@bakeries_router.get("/bakery_course")
-def get_bakeries_info():
+# 코스 목록 조회
+@course_router.get("/courses")
+def get_courses():
+    """모든 코스 목록을 반환"""
+    query = """
+        SELECT id, course_name, description, image_url
+        FROM tour_course
     """
-    지정된 빵집들의 정보를 반환하며, 여러 개의 이미지 URL을 포함
-    """
-    bakery_names = ["성심당 본점", "몽심 대흥점", "하레하레 둔산점", "르뺑99-1", "꾸드뱅", "연선흠과자점"]
-    data = fetch_bakeries_info_with_images(bakery_names)
+    data = fetch_data(query)
 
     if data.empty:
-        raise HTTPException(status_code=404, detail="No data found for the given bakeries")
+        raise HTTPException(status_code=404, detail="No courses found")
 
-    # 데이터를 딕셔너리로 변환 후 반환
     return data.to_dict(orient="records")
 
-@bakeries_router.get("/bread_tour")
-def get_bread_tour_overview():
+# 특정 코스의 상세 정보 조회
+@course_router.get("/courses/{course_id}")
+def get_course_details(course_id: int):
+    """특정 코스의 상세 정보를 반환"""
+    # 코스 정보 가져오기
+    course_query = """
+        SELECT id, course_name, description, image_url
+        FROM tour_course
+        WHERE id = %s
     """
-    빵지순례 코스 전체 정보 반환
+    course_data = fetch_data(course_query, params=[course_id])
+
+    if course_data.empty:
+        raise HTTPException(status_code=404, detail=f"Course with ID {course_id} not found")
+
+    # 코스에 포함된 빵집 정보 가져오기
+    details_query = """
+        SELECT 
+            tse.spot_name AS bakery_name, 
+            tse.spot_address AS address, 
+            tse.rating, 
+            tse.phone, 
+            tse.business_hours, 
+            tse.spot_description AS description,
+            tsie.tourist_spot_image_url AS image_url
+        FROM bread_tour_course_details AS btcd
+        JOIN tourist_spot_entity AS tse
+        ON btcd.bakery_id = tse.id
+        LEFT JOIN tourist_spot_image_entity AS tsie
+        ON tse.id = tsie.tourist_spot_entity_id
+        WHERE btcd.course_id = %s
     """
-    try:
-        # 코스 이름과 간략한 설명, 대표 이미지만 반환
-        response = {
-            "course_name": "대전 빵지순례 코스",
-            "description": "대전의 다양한 빵집을 탐방해보세요!",
-            "image_url": "https://example.com/대표이미지.png"  # 대표 이미지 URL
-        }
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating course overview: {e}")
+    details_data = fetch_data(details_query, params=[course_id])
+
+    if details_data.empty:
+        raise HTTPException(status_code=404, detail=f"No bakeries found for course ID {course_id}")
+
+    # 코스 정보와 빵집 정보 결합
+    response = {
+        "course": course_data.to_dict(orient="records")[0],
+        "bakeries": details_data.to_dict(orient="records")
+    }
+
+    return response
