@@ -3,7 +3,8 @@ import uvicorn
 from routers.recommendation import recommendation_router
 from routers.bakeryrouter import bakeryrouter
 
-app = FastAPI(docs_url="/fast_api/docs")
+app = FastAPI(docs_url="/fast_api/docs",
+              openapi_url="/fast_api/openapi.json")
 
 # 라우터 연결
 app.include_router(recommendation_router, prefix="/fast_api")
