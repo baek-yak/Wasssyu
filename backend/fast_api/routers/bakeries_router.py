@@ -16,14 +16,24 @@ DB_CONFIG = {
 bakeries_router = APIRouter()
 
 # PostgreSQL에서 데이터 로드 함수
-def fetch_bakeries_info(names: List[str]):
+def fetch_bakeries_info_with_images(names: List[str]):
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         placeholders = ', '.join(['%s'] * len(names))
         query = f"""
-            SELECT name, address, rating, review_count, phone, business_hours, description
-            FROM bakeries
-            WHERE name IN ({placeholders})
+            SELECT 
+                b.name, 
+                b.address, 
+                b.rating, 
+                b.review_count, 
+                b.phone, 
+                b.business_hours, 
+                b.description, 
+                be.image_url
+            FROM bakeries AS b
+            LEFT JOIN breadmon_entity AS be
+            ON b.temp_id = be.bakery_temp_id
+            WHERE b.name IN ({placeholders})
         """
         data = pd.read_sql_query(query, conn, params=names)
         conn.close()
@@ -36,7 +46,7 @@ def fetch_bakeries_info(names: List[str]):
 def get_bakeries_info():
     """지정된 빵집들의 정보를 반환"""
     bakery_names = ["성심당 본점", "몽심 대흥점", "하레하레 둔산점", "르뺑99-1", "꾸드뱅", "연선흠과자점"]
-    data = fetch_bakeries_info(bakery_names)
+    data = fetch_bakeries_info_with_images(bakery_names)
 
     if data.empty:
         raise HTTPException(status_code=404, detail="No data found for the given bakeries")
