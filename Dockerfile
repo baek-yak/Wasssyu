@@ -18,6 +18,13 @@ RUN conda create -n fastapi_env python=3.9.20 -y && \
 # SHELL 명령어를 통해 환경 활성화 설정
 SHELL ["conda", "run", "-n", "fastapi_env", "/bin/bash", "-c"]
 
+# PostgreSQL 클라이언트 및 필수 라이브러리 설치
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    postgresql-client \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
 # PYTHONPATH 설정으로 fast_api를 루트로 추가
 ENV PYTHONPATH=/app/backend/fast_api
 
@@ -25,4 +32,4 @@ ENV PYTHONPATH=/app/backend/fast_api
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 # FastAPI 애플리케이션 실행 명령어
-CMD ["conda", "run", "-n", "fastapi_env", "uvicorn", "backend.fast_api.main:app", "--host", "0.0.0.0"]
+CMD ["conda", "run", "-n", "fastapi_env", "uvicorn", "backend.fast_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
