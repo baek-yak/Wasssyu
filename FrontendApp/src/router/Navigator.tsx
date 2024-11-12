@@ -8,7 +8,6 @@ import TravelChallenge from '../pages/TravelChallenge';
 import MonopolyPage from '../pages/MonopolyPage';
 import Community from '../pages/Community';
 import Ar from '../pages/Ar';
-import Gps from '../pages/Gps';
 import FindPassword from '../pages/FindPassword';
 import MyPage from '../pages/MyPage';
 import TravelItinerary from '../pages/TravelItinerary';
@@ -32,6 +31,8 @@ import Map from '../pages/Map';
 import PostDetail from '../components/Community/PostDetail';
 import EditPost from '../components/Community/EditPost';
 import Itinerary from '../components/TravelItinerary/Itinerary';
+import DetailedInquiry from '../components/TravelItinerary/DetailedInquiry';
+import ReItinerary from '../components/TravelItinerary/ReItinerary';
 import {Day} from '../types';
 
 export type RootStackParamList = {
@@ -43,7 +44,6 @@ export type RootStackParamList = {
   MonopolyPage: undefined;
   Community: undefined;
   Ar: undefined;
-  Gps: undefined;
   FindPassword: undefined;
   MyPage: undefined;
   TravelItinerary: undefined;
@@ -74,12 +74,40 @@ export type RootStackParamList = {
   Map: undefined;
   PostDetail: {articleId: string};
   Itinerary: {dayId: string};
+  ReItinerary: {dayId: string};
   EditPost: {
     articleId: string;
     initialTitle: string;
     initialContent: string;
     initialImages: any[];
     initialtags: string;
+  };
+  DetailedInquiry: {
+    itinerary?: {
+      scheduleId: number;
+      title: string;
+      startDate: string;
+      endDate: string;
+      dailyPlans: {
+        planId: number;
+        date: string;
+        touristSpots: {
+          spotId: number;
+          spotName: string;
+          spotAddress: string;
+          favoritesCount: number;
+          reviewCount: number;
+          imageCount: number;
+          favorite: boolean;
+        }[];
+      }[];
+    };
+    selectedPlace?: {
+      id: string;
+      name: string;
+      address: string;
+    };
+    dayId?: string;
   };
 };
 
@@ -104,7 +132,6 @@ function Navigator() {
       <Stack.Screen name="MonopolyPage" component={MonopolyPage} options={{headerShown: false}} />
       <Stack.Screen name="Community" component={Community} options={{headerShown: false}} />
       <Stack.Screen name="Ar" component={Ar} options={{headerShown: false}} />
-      <Stack.Screen name="Gps" component={Gps} options={{headerShown: false}} />
       <Stack.Screen name="FindPassword" component={FindPassword} options={{headerShown: false}} />
       <Stack.Screen name="MyPage" component={MyPage} options={{headerShown: false}} />
       <Stack.Screen
@@ -155,6 +182,12 @@ function Navigator() {
       <Stack.Screen name="PostDetail" component={PostDetail} options={{headerShown: false}} />
       <Stack.Screen name="EditPost" component={EditPost} options={{headerShown: false}} />
       <Stack.Screen name="Itinerary" component={Itinerary} options={{headerShown: false}} />
+      <Stack.Screen
+        name="DetailedInquiry"
+        component={DetailedInquiry}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen name="ReItinerary" component={ReItinerary} options={{headerShown: false}} />
       <Stack.Screen
         name="CommunitySearch"
         component={CommunitySearch}

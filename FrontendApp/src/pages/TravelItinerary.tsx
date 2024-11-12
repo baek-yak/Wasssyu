@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,14 @@ import {
   ImageBackground,
 } from 'react-native';
 import DeleteConfirmationModal from '../components/MyPage/DeleteConfirmationModal';
-import {useNavigation} from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
 import type {RootStackParamList} from '../router/Navigator';
+import {deleteSchedule, getMySchedules, getScheduleDetails} from '../api/itinerary';
 
 type TravelItineraryNavigationProp = StackNavigationProp<RootStackParamList>;
 const {width} = Dimensions.get('window');
+
 interface TripItem {
   id: string;
   title: string;
@@ -26,6 +28,63 @@ interface TripItem {
 const TravelItinerary = () => {
   const navigation = useNavigation<TravelItineraryNavigationProp>();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
+  const [onGoingSchedules, setOnGoingSchedules] = useState<TripItem | null>(null);
+  const [upcomingSchedules, setUpcomingSchedules] = useState<TripItem[]>([]);
+  const [pastSchedules, setPastSchedules] = useState<TripItem[]>([]);
+
+  const fetchSchedules = async () => {
+    const schedules = await getMySchedules();
+    if (schedules) {
+      const ongoingSchedule: TripItem | null = schedules.onGoingSchedules
+        ? {
+            id: schedules.onGoingSchedules.scheduleId.toString(),
+            title: schedules.onGoingSchedules.title,
+            date: `${schedules.onGoingSchedules.startDate} ~ ${schedules.onGoingSchedules.endDate}`,
+            places: `${schedules.onGoingSchedules.spotCount}개 관광지`,
+          }
+        : null;
+
+      const upcoming = schedules.upcomingSchedules.map(schedule => ({
+        id: schedule.scheduleId.toString(),
+        title: schedule.title,
+        date: `${schedule.startDate} ~ ${schedule.endDate}`,
+        places: `${schedule.spotCount}개 관광지`,
+      }));
+
+      const past = schedules.pastSchedules.map(schedule => ({
+        id: schedule.scheduleId.toString(),
+        title: schedule.title,
+        date: `${schedule.startDate} ~ ${schedule.endDate}`,
+        places: `${schedule.spotCount}개 관광지`,
+      }));
+
+      setOnGoingSchedules(ongoingSchedule);
+      setUpcomingSchedules(upcoming);
+      setPastSchedules(past);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchSchedules();
+    }, []),
+  );
+
+  useEffect(() => {
+    fetchSchedules();
+  }, []);
+
+  const handleSchedulePress = async (scheduleId: string) => {
+    try {
+      const scheduleDetails = await getScheduleDetails(scheduleId);
+      if (scheduleDetails) {
+        navigation.navigate('DetailedInquiry', {itinerary: scheduleDetails});
+      }
+    } catch (error) {
+      console.error('Failed to fetch schedule details:', error);
+    }
+  };
 
   const goToRecommend = () => {
     navigation.navigate('RecommendedPlace');
@@ -38,32 +97,67 @@ const TravelItinerary = () => {
   const goToTravelChallenge = () => {
     navigation.navigate('TravelChallenge');
   };
-  const handleTrashPress = () => {
+
+  const handleTrashPress = (scheduleId: string) => {
+    setSelectedScheduleId(scheduleId);
     setIsModalVisible(true);
   };
 
-  const closeModal = () => {
-    setIsModalVisible(false);
+  const confirmDelete = () => {
+    if (selectedScheduleId) {
+      handleDelete(selectedScheduleId);
+    }
   };
-  const renderTripItem = ({item}: {item: TripItem}) => (
-    <View style={styles.tripContainer}>
-      <View>
-        <Text style={styles.tripTitle}>{item.title}</Text>
-        <Text style={styles.tripDate}>{item.date}</Text>
-        <Text style={styles.tripPlaces}>{item.places}</Text>
+
+  const handleDelete = async (scheduleId: string) => {
+    const isDeleted = await deleteSchedule(scheduleId);
+    if (isDeleted) {
+      console.log('삭제 성공');
+      await fetchSchedules(); // 일정 목록을 새로 로드
+      setIsModalVisible(false);
+    } else {
+      console.error('일정 삭제 실패');
+    }
+  };
+
+  const renderOngoingTripItem = ({item}: {item: TripItem}) => (
+    <TouchableOpacity onPress={() => handleSchedulePress(item.id)}>
+      <View style={[styles.tripContainer, styles.onGoingTripContainer]}>
+        <View>
+          <Text style={styles.tripTitle}>{item.title}</Text>
+          <Text style={styles.tripDate}>{item.date}</Text>
+          <Text style={styles.tripPlaces}>{item.places}</Text>
+        </View>
+        <Image source={require('../assets/imgs/travel1.png')} style={styles.tripImage} />
+        <TouchableOpacity style={styles.trashButton} onPress={() => handleTrashPress(item.id)}>
+          <Image source={require('../assets/imgs/trash.png')} style={styles.trashIcon} />
+        </TouchableOpacity>
       </View>
-      <Image source={require('../assets/imgs/travel1.png')} style={styles.tripImage} />
-      <TouchableOpacity style={styles.trashButton} onPress={handleTrashPress}>
-        <Image source={require('../assets/imgs/trash.png')} style={styles.trashIcon} />
-      </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
+
+  const renderTripItem = ({item}: {item: TripItem}) => (
+    <TouchableOpacity onPress={() => handleSchedulePress(item.id)}>
+      <View style={styles.tripContainer}>
+        <View>
+          <Text style={styles.tripTitle}>{item.title}</Text>
+          <Text style={styles.tripDate}>{item.date}</Text>
+          <Text style={styles.tripPlaces}>{item.places}</Text>
+        </View>
+        <Image source={require('../assets/imgs/travel1.png')} style={styles.tripImage} />
+        <TouchableOpacity style={styles.trashButton} onPress={() => handleTrashPress(item.id)}>
+          <Image source={require('../assets/imgs/trash.png')} style={styles.trashIcon} />
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <Text style={styles.title}>대전,{'\n'}여행왔슈?</Text>
-          <Image source={require('../assets/imgs/dajeonlogo.png')} style={styles.logo} />
+          <Image source={require('../assets/imgs/Group500.png')} style={styles.logo} />
         </View>
         <TouchableOpacity style={styles.headerButton} onPress={goToRecommend}>
           <Image source={require('../assets/imgs/list.png')} style={styles.buttonIcon} />
@@ -78,6 +172,7 @@ const TravelItinerary = () => {
           <Text style={styles.addButtonSubtitle}>대전와슈와 대전 여행을 함께하세요</Text>
         </View>
       </TouchableOpacity>
+
       {/* 대전와슈 추천 코스 보기 */}
       <View style={styles.sectionContainer}>
         <Text style={styles.sectionTitle}>대전와슈 추천 코스 보기</Text>
@@ -97,7 +192,9 @@ const TravelItinerary = () => {
         </View>
 
         <View style={styles.imageWrapper}>
-          <ImageBackground source={require('../assets/imgs/breadLong.png')} style={styles.image}>
+          <ImageBackground
+            source={require('../assets/imgs/Rectangle74067.png')}
+            style={styles.image}>
             <View style={styles.overlay}>
               <Text style={styles.overlayTitle}>대전 빵지순례</Text>
               <Text style={styles.overlayDescription}>대전의 다양한 빵집을 소개합니다</Text>
@@ -106,49 +203,58 @@ const TravelItinerary = () => {
         </View>
       </ScrollView>
 
+      {/* 진행중인 여행 */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>진행중인 여행</Text>
+        <Image source={require('../assets/imgs/trtr.png')} style={styles.icon} />
+      </View>
+      {onGoingSchedules ? (
+        <FlatList
+          data={[onGoingSchedules]}
+          renderItem={renderOngoingTripItem}
+          keyExtractor={item => item.id}
+          scrollEnabled={false}
+        />
+      ) : (
+        <Text style={styles.noDataText}>진행 중인 여행이 없습니다</Text>
+      )}
+
       {/* 다가오는 여행 */}
       <View style={styles.sectionContainer}>
         <Text style={styles.sectionTitle}>다가오는 여행</Text>
         <Image source={require('../assets/imgs/commingsoon.png')} style={styles.icon} />
       </View>
-      <FlatList
-        data={[
-          {
-            id: '1',
-            title: '현수의 대전 나들이',
-            date: '2024.10.24 ~ 2024.10.26',
-            places: '4개 관광지',
-          },
-        ]}
-        renderItem={renderTripItem}
-        keyExtractor={item => item.id}
-        style={styles.tripList}
-        scrollEnabled={false} // FlatList 내부 스크롤을 비활성화
-      />
+      {upcomingSchedules.length > 0 ? (
+        <FlatList
+          data={upcomingSchedules}
+          renderItem={renderTripItem}
+          keyExtractor={item => item.id}
+          scrollEnabled={false}
+        />
+      ) : (
+        <Text style={styles.noDataText}>다가오는 여행이 없습니다</Text>
+      )}
+
       {/* 지난 여행 */}
       <View style={styles.sectionContainer}>
         <Text style={styles.sectionTitle}>지난 여행</Text>
         <Image source={require('../assets/imgs/past.png')} style={styles.icon} />
       </View>
-      <FlatList
-        data={[
-          {
-            id: '2',
-            title: '현수의 지난 여행',
-            date: '2024.10.20 ~ 2024.10.21',
-            places: '3개 관광지',
-          },
-        ]}
-        renderItem={renderTripItem}
-        keyExtractor={item => item.id}
-        style={styles.tripList}
-        scrollEnabled={false} // FlatList 내부 스크롤을 비활성화
-      />
-      {/* 삭제 확인 모달 */}
+      {pastSchedules.length > 0 ? (
+        <FlatList
+          data={pastSchedules}
+          renderItem={renderTripItem}
+          keyExtractor={item => item.id}
+          scrollEnabled={false}
+        />
+      ) : (
+        <Text style={styles.noDataText}>지난 여행이 없습니다</Text>
+      )}
+
       <DeleteConfirmationModal
         visible={isModalVisible}
-        onCancel={closeModal}
-        onConfirm={closeModal}
+        onCancel={() => setIsModalVisible(false)}
+        onConfirm={confirmDelete}
       />
     </ScrollView>
   );
@@ -169,35 +275,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    // marginBottom: 10,
     width: '100%',
     padding: 20,
   },
   logo: {
     width: 60,
     height: 60,
-    marginRight: 10,
   },
   title: {
     fontSize: 20,
     color: '#fff',
-    fontWeight: 'bold',
+    fontFamily: 'Pretendard-Bold',
     lineHeight: 30,
   },
   headerButton: {
-    flexDirection: 'row', // 이미지와 텍스트를 가로로 배치
-    alignItems: 'center', // 이미지와 텍스트의 수직 가운데 정렬
+    flexDirection: 'row',
+    alignItems: 'center',
     width: '48%',
     backgroundColor: '#2F5A50',
     paddingVertical: 4,
-    paddingHorizontal: 15,
     borderRadius: 10,
     justifyContent: 'center',
   },
   buttonIcon: {
     width: 20,
     height: 20,
-    marginRight: 20, // 이미지와 텍스트 사이 간격
+    marginRight: 20,
   },
   headerButtonText: {
     color: '#fff',
@@ -213,11 +316,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 15,
     alignSelf: 'center',
+    borderColor: '#f1f1f1',
+    borderWidth: 2,
   },
   plusIcon: {
     width: 33,
     height: 33,
-    marginBottom: 5,
   },
   textContainer: {
     flexDirection: 'column',
@@ -231,18 +335,17 @@ const styles = StyleSheet.create({
   addButtonSubtitle: {
     fontSize: 10,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(51, 51, 51, 0.8)', // 80% 투명도 적용
+    color: 'rgba(51, 51, 51, 0.8)',
     marginTop: 5,
   },
   sectionContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
     padding: 20,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: 'Pretendard-Bold',
     color: '#333',
   },
   viewAllText: {
@@ -256,7 +359,7 @@ const styles = StyleSheet.create({
     width: 25,
     height: 25,
     marginLeft: 10,
-    marginTop: 15,
+    marginTop: 5,
   },
   imageContainer: {
     marginBottom: 20,
@@ -288,39 +391,39 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: 'Pretendard-Regular',
   },
-  tripList: {
-    marginBottom: 20,
-  },
   tripContainer: {
-    width: '90%',
+    width: '85%',
     height: 110,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    marginLeft: 20,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.1)',
     justifyContent: 'space-between',
+    marginBottom: 20,
   },
   tripTitle: {
     fontSize: 14,
-    fontWeight: 'bold',
     color: '#333333',
+    fontFamily: 'Pretendard-Bold',
   },
   tripDate: {
     fontSize: 12,
     color: '#999999',
     marginTop: 15,
+    fontFamily: 'Pretendard-Regular',
   },
   tripPlaces: {
     fontSize: 12,
     color: '#999999',
+    fontFamily: 'Pretendard-Regular',
   },
   tripImage: {
-    width: 60,
-    height: 60,
+    width: 80,
+    height: 80,
     borderRadius: 5,
     marginLeft: 50,
   },
@@ -334,6 +437,17 @@ const styles = StyleSheet.create({
   trashIcon: {
     width: 24,
     height: 24,
+  },
+  noDataText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  onGoingTripContainer: {
+    borderColor: '#418663',
+    borderWidth: 2,
+    backgroundColor: '#E6F4EC',
   },
 });
 

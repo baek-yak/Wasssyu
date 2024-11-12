@@ -129,5 +129,7 @@ dependencies {
 
     // ARCore 라이브러리를 추가하여 AR 기능을 활성화합니다.
     implementation 'com.google.ar:core:1.33.0'
+
+    implementation 'com.google.android.gms:play-services-maps:17.0.0'
 }
 
