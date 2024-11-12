@@ -21,7 +21,7 @@ def fetch_bakeries_info(names: List[str]):
         conn = psycopg2.connect(**DB_CONFIG)
         placeholders = ', '.join(['%s'] * len(names))
         query = f"""
-            SELECT name, address, rating, review_count, phone, business_hour, description
+            SELECT name, address, rating, review_count, phone, business_hours, description
             FROM bakeries
             WHERE name IN ({placeholders})
         """
