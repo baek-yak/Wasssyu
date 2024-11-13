@@ -31,4 +31,4 @@ COPY backend/ /app/backend
 COPY config.py /app/config.py
 
 # FastAPI 애플리케이션 실행 명령어
-CMD ["conda", "run", "-n", "fastapi_env", "uvicorn", "backend.fast_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["conda", "run", "-n", "fastapi_env", "uvicorn", "backend.fast_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
