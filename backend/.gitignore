@@ -27,6 +27,7 @@ share/python-wheels/
 MANIFEST
 
 /Users/gangbyeong-gyu/VSCodeProjects/ML/S11P31B105/backend/data/csv_files
+/home/ubuntu/kang_workspace/S11P31B105/backend/fast_api/.env
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
