@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException, Request, Depends
 import uvicorn
 import os
 import jwt
-from jwt import PyJWTError
 from dotenv import load_dotenv
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
