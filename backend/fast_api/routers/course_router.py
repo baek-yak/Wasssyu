@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 import psycopg2
-import pandas as pd
+import psycopg2.extras
 
 # PostgreSQL DB 설정
 DB_CONFIG = {
@@ -19,9 +19,11 @@ def fetch_data(query, params=None):
     """데이터베이스에서 데이터를 조회하는 함수"""
     try:
         conn = psycopg2.connect(**DB_CONFIG)
-        data = pd.read_sql_query(query, conn, params=params)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cursor.execute(query, params)
+        records = cursor.fetchall()
         conn.close()
-        return data
+        return records
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
@@ -35,10 +37,12 @@ def get_courses():
     """
     data = fetch_data(query)
 
-    if data.empty:
+    if not data:
         raise HTTPException(status_code=404, detail="No courses found")
 
-    return data.to_dict(orient="records")
+    # 데이터를 Dict 형태로 변환
+    courses = [dict(row) for row in data]
+    return courses
 
 # 특정 코스의 상세 정보 조회
 @course_router.get("/courses/{course_id}")
@@ -52,7 +56,7 @@ def get_course_details(course_id: int):
     """
     course_data = fetch_data(course_query, params=[course_id])
 
-    if course_data.empty:
+    if not course_data:
         raise HTTPException(status_code=404, detail=f"Course with ID {course_id} not found")
 
     # 코스에 포함된 빵집 정보 가져오기
@@ -65,22 +69,22 @@ def get_course_details(course_id: int):
             tse.business_hours, 
             tse.spot_description AS description,
             tsie.tourist_spot_image_url AS image_url
-        FROM bread_tour_course_details AS btcd
+        FROM tour_course_details_entity AS tcde
         JOIN tourist_spot_entity AS tse
-        ON btcd.bakery_id = tse.id
+        ON tcde.bakery_id = tse.id
         LEFT JOIN tourist_spot_image_entity AS tsie
         ON tse.id = tsie.tourist_spot_entity_id
-        WHERE btcd.course_id = %s
+        WHERE tcde.course_id = %s
     """
     details_data = fetch_data(details_query, params=[course_id])
 
-    if details_data.empty:
-        raise HTTPException(status_code=404, detail=f"No bakeries found for course ID {course_id}")
+    if not details_data:
+        raise HTTPException(status_code=404, detail=f"No spots found for course ID {course_id}")
 
     # 코스 정보와 빵집 정보 결합
     response = {
-        "course": course_data.to_dict(orient="records")[0],
-        "bakeries": details_data.to_dict(orient="records")
+        "course": dict(course_data[0]),
+        "bakeries": [dict(row) for row in details_data]
     }
 
     return response
