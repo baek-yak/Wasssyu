@@ -11,10 +11,10 @@ DB_CONFIG = {
 
 # 삽입할 데이터
 tour_course_data = {
-    "course_name": "대전 빵지순례 코스",
-    "description": "대전의 다양한 빵집을 탐방해보세요!",
+    "course_name": "대전 쇼핑 코스",
+    "description": "대전의 쇼핑코스를 즐겨보세요!",
     "image_url": "https://example.com/bread_tour.png",
-    "bakeries": [
+    "stores": [
         "성심당 본점", "몽심 대흥점", "하레하레 둔산점", "르뺑99-1", "꾸드뱅", "연선흠과자점"
     ]
 }
@@ -27,7 +27,7 @@ def insert_tour_course_with_bakeries():
 
         # `tour_course` 테이블에 코스 데이터 삽입
         cur.execute("""
-            INSERT INTO tour_course (course_name, description, image_url)
+            INSERT INTO shoping_course (course_name, description, image_url)
             VALUES (%s, %s, %s)
             RETURNING id;
         """, (tour_course_data["course_name"], tour_course_data["description"], tour_course_data["image_url"]))
