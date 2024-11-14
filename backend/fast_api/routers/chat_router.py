@@ -5,6 +5,7 @@ import numpy as np
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+import json
 from db_conect import connect_to_db
 
 load_dotenv()
