@@ -67,6 +67,7 @@ def get_course_details(course_id: int):
             tse.rating, 
             tse.phone, 
             tse.business_hours, 
+            tes.elastic_id,
             tse.spot_description AS description,
             tsie.tourist_spot_image_url AS image_url
         FROM tour_course_details_entity AS tcde
