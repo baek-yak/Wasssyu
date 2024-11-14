@@ -10,7 +10,7 @@ from typing import List
 import pandas as pd
 from geopy.distance import geodesic
 import joblib
-from config import DATA_PATH, MODEL_PATH
+from kang_workspace.S11P31B105.config import DATA_PATH, MODEL_PATH
 
 # 저장된 데이터 및 모델 불러오기
 data = pd.read_csv(DATA_PATH)

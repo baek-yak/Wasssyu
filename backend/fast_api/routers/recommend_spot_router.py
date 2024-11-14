@@ -1,126 +1,121 @@
-from fastapi import APIRouter, HTTPException
-import psycopg2
-import pandas as pd
+from fastapi import APIRouter, HTTPException, Query
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+import json
 from openai import OpenAI
-
 from dotenv import load_dotenv
 import os
+from db_conect import connect_to_db
+from psycopg2.extras import RealDictCursor
 
+# 환경 변수 로드
 load_dotenv()
 
-POSTGRES_USER = os.getenv("POSTGRES_USER")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-POSTGRES_DB = os.getenv("POSTGRES_DB")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT")
-POSTGRES_HOST = os.getenv("POSTGRES_HOST")
-ELASTIC_USERNAME = os.getenv("ELASTIC_USERNAME")
-ELASTIC_PASSWORD = os.getenv("ELASTIC_PASSWORD")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
 # OpenAI API 설정
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
-
-# PostgreSQL DB 설정
-DB_CONFIG = {
-    "user": POSTGRES_USER,
-    "password": POSTGRES_PASSWORD,
-    "dbname": POSTGRES_DB,
-    "host": POSTGRES_HOST,
-    "port": POSTGRES_PORT,
-}
 
 # 라우터 생성
 recommend_router = APIRouter()
 
-# 데이터베이스 연결 및 데이터 로드
-def load_spots_from_db():
-    """tourist_spot_entity 및 관련 이미지 데이터를 로드"""
-    try:
-        conn = psycopg2.connect(**DB_CONFIG)
-        query = """
-            SELECT 
-                tse.id AS spot_id,
-                tse.spot_name,
-                tse.spot_address,
-                tse.spot_description,
-                tse.latitude,
-                tse.longitude,
-                tse.business_hours,
-                tse.phone,
-                tse.rating,
-                tse.embedding,
-                tsie.tourist_spot_image_url
-            FROM tourist_spot_entity tse
-            LEFT JOIN tourist_spot_image_entity tsie
-            ON tse.id = tsie.tourist_spot_entity_id
-        """
-        data = pd.read_sql_query(query, conn)
-        conn.close()
-
-        # 누락된 벡터 제거
-        data = data.dropna(subset=["embedding"])
-        data["embedding"] = data["embedding"].apply(lambda x: np.array(eval(x)) if isinstance(x, str) else x)
-
-        # 일관된 형상 유지
-        data = data[data["embedding"].apply(lambda x: x.shape[0] if isinstance(x, np.ndarray) else 0) == 768]
-
-        return data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-# 사용자 입력 임베딩 생성
-def generate_user_embedding(user_input):
-    """OpenAI를 사용하여 사용자 입력을 벡터 임베딩으로 변환"""
+def get_openai_embedding(text):
+    """
+    OpenAI API를 사용하여 텍스트 임베딩을 생성합니다.
+    
+    :param text: 사용자 입력 텍스트
+    :return: 1536차원 임베딩 벡터 (numpy array)
+    """
     try:
         response = client.embeddings.create(
-            input=user_input,
-            model="text-embedding-ada-002"
+            input=text,
+            model="text-embedding-3-large"
         )
-        return np.array(response.data[0].embedding)
+        embedding = response.data[0].embedding
+        return np.array(embedding, dtype=np.float32)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenAI API error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching embedding from OpenAI: {e}")
 
-# 유사도 계산 및 추천
-def recommend_places(user_input):
-    """사용자 입력과 장소 데이터의 임베딩 유사도를 계산하여 장소 추천"""
-    data = load_spots_from_db()
-    if data.empty:
-        raise HTTPException(status_code=404, detail="No data found in the database")
-
-    # 사용자 입력 임베딩 생성
-    user_embedding = generate_user_embedding(user_input)
-
-    # 임베딩 간 코사인 유사도 계산
-    embeddings = np.stack(data["embedding"].to_numpy())
-    similarities = cosine_similarity([user_embedding], embeddings)[0]
-
-    # 데이터에 유사도 추가
-    data["similarity"] = similarities
-
-    # 유사도 상위 5개 장소 선택
-    recommended_data = data.sort_values(by="similarity", ascending=False).head(5)
-
-    # 결과를 그룹화하여 반환
-    recommendations = []
-    for spot_id, group in recommended_data.groupby("spot_id"):
-        spot_info = group.iloc[0].to_dict()
-        images = group["tourist_spot_image_url"].dropna().tolist()
-        spot_info["images"] = images
-        recommendations.append(spot_info)
-
-    return recommendations
-
-# 추천 엔드포인트
-@recommend_router.post("/recommend_spot")
-def get_recommendations(user_input: str):
+def fetch_tourist_spots_from_db():
     """
-    사용자의 입력을 기반으로 장소를 추천
-    :param user_input: 사용자 입력 텍스트
-    :return: 추천 장소 리스트
+    데이터베이스에서 관광지 데이터를 가져옵니다.
+    
+    :return: 관광지 데이터 리스트
+    """
+    query = """
+    SELECT 
+        tse.id,
+        tse.spot_name,
+        tse.spot_address,
+        tse.spot_description,
+        tse.elastic_id,
+        tse.phone,
+        tse.daily_plan_entity_id,
+        tse.embedding,
+        tsie.tourist_spot_image_url
+    FROM 
+        tourist_spot_entity tse
+    LEFT JOIN 
+        tourist_spot_image_entity tsie
+    ON 
+        tse.id = tsie.tourist_spot_entity_id;
     """
     try:
-        recommendations = recommend_places(user_input)
-        return {"recommendations": recommendations}
+        connection = connect_to_db()
+        cursor = connection.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(query)
+        results = cursor.fetchall()
+        return results
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error fetching data from database: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+@recommend_router.post("/recommend")
+async def recommend_places(user_input: str = Query(..., description="Enter a description or keywords for the tourist spot")):
+    """
+    사용자 입력을 기반으로 가장 유사한 장소 10개를 반환합니다.
+    
+    :param user_input: 사용자 입력 텍스트
+    :return: 유사한 장소 데이터 리스트
+    """
+    try:
+        # 사용자 입력 임베딩
+        user_vector = get_openai_embedding(user_input)
+        
+        # DB에서 관광지 데이터 가져오기
+        spots = fetch_tourist_spots_from_db()
+        
+        # 관광지 데이터와 유사도 계산
+        similarities = []
+        for spot in spots:
+            if spot["embedding"] is not None:
+                try:
+                    # `embedding`이 JSON 문자열이라면 변환
+                    db_vector = np.array(json.loads(spot["embedding"]), dtype=np.float32)
+                except (TypeError, ValueError) as e:
+                    continue
+                
+                # 유사도 계산
+                similarity = cosine_similarity([user_vector], [db_vector])[0][0]
+                similarities.append({
+                    "id": spot["id"],
+                    "spot_name": spot["spot_name"],
+                    "spot_address": spot["spot_address"],
+                    "spot_description": spot["spot_description"],
+                    "elastic_id": spot["elastic_id"],
+                    "phone": spot["phone"],
+                    "daily_plan_entity_id": spot["daily_plan_entity_id"],
+                    "tourist_spot_image_url": spot["tourist_spot_image_url"],
+                    "similarity": similarity
+                })
+        
+        # 유사도로 정렬 후 상위 10개 반환
+        top_similar_places = sorted(similarities, key=lambda x: x["similarity"], reverse=True)[:10]
+        return {"results": top_similar_places}
+
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in finding similar places: {e}")
