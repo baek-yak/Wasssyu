@@ -108,7 +108,7 @@ def recommend_places(user_input):
     return recommendations
 
 # 추천 엔드포인트
-@recommend_router.post("/recommend")
+@recommend_router.post("/recommend_spot")
 def get_recommendations(user_input: str):
     """
     사용자의 입력을 기반으로 장소를 추천
