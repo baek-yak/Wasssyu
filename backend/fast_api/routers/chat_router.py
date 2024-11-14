@@ -10,13 +10,12 @@ import os
 
 load_dotenv()
 
+# 환경 변수 로드
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_DB = os.getenv("POSTGRES_DB")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")
-ELASTIC_USERNAME = os.getenv("ELASTIC_USERNAME")
-ELASTIC_PASSWORD = os.getenv("ELASTIC_PASSWORD")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # OpenAI API 설정
@@ -36,29 +35,24 @@ chat_router = APIRouter()
 
 # PostgreSQL에서 데이터 로드
 def load_all_data():
-    """모든 테이블 데이터를 통합하여 로드"""
-    table_names = [
-        "bakeries",
-        "restaurants",
-        "cultural_sites",
-        "eco_sites",
-        "historical_sites",
-        "main_sites"
-    ]
-    all_data = []
+    """tourist_spot_entity 테이블에서 데이터 로드"""
     try:
         conn = psycopg2.connect(**DB_CONFIG)
-        for table in table_names:
-            query = f"SELECT name, category, address, rating, review_count, phone, description, embedding FROM {table}"
-            table_data = pd.read_sql_query(query, conn)
-            table_data['source_table'] = table  # 테이블 이름 추가
-            all_data.append(table_data)
+        query = """
+        SELECT 
+            spot_name AS name,
+            spot_address AS address,
+            spot_description AS description,
+            phone,
+            embedding,
+            rating,
+            favorites_count
+        FROM tourist_spot_entity;
+        """
+        data = pd.read_sql_query(query, conn)
         conn.close()
 
-        # 모든 데이터를 하나의 데이터프레임으로 결합
-        data = pd.concat(all_data, ignore_index=True)
-
-        # 벡터 데이터는 이미 VECTOR 타입으로 처리되므로 별도 변환 불필요
+        # 벡터 데이터가 이미 vector 타입으로 저장되어 있으므로 변환 불필요
         return data
     except Exception as e:
         print(f"Error loading data: {e}")
@@ -91,11 +85,11 @@ def handle_course_recommendation(user_input, data, filters=None):
     if filters:
         if 'min_rating' in filters:
             data = data[data['rating'] >= filters['min_rating']]
-        if 'min_reviews' in filters:
-            data = data[data['review_count'] >= filters['min_reviews']]
+        if 'min_favorites' in filters:
+            data = data[data['favorites_count'] >= filters['min_favorites']]
 
     recommended = data.sort_values(by='similarity', ascending=False).head(5)
-    return recommended[['name', 'category', 'address', 'rating', 'review_count', 'phone', 'source_table']]
+    return recommended[['name', 'address', 'rating', 'favorites_count', 'phone']]
 
 # 정보 요청 처리
 def handle_info_request(user_input, data):
@@ -106,8 +100,8 @@ def handle_info_request(user_input, data):
                 return f"{row['name']}의 주소는 {row['address']}입니다."
             elif "평점" in user_input:
                 return f"{row['name']}의 평점은 {row['rating']}입니다."
-            elif "리뷰" in user_input:
-                return f"{row['name']}의 리뷰 수는 {row['review_count']}개입니다."
+            elif "즐겨찾기" in user_input:
+                return f"{row['name']}의 즐겨찾기 수는 {row['favorites_count']}개입니다."
             elif "전화" in user_input:
                 return f"{row['name']}의 전화번호는 {row['phone']}입니다."
             
@@ -150,8 +144,8 @@ def process_user_input(user_input, data):
         filters = {}
         if "평점 높은" in user_input:
             filters['min_rating'] = 4.0
-        if "리뷰 많은" in user_input:
-            filters['min_reviews'] = 100
+        if "즐겨찾기 많은" in user_input:
+            filters['min_favorites'] = 100
         result = handle_course_recommendation(user_input, data, filters)
         response = result.to_string(index=False)
     elif action == "정보 요청":
@@ -165,7 +159,7 @@ def process_user_input(user_input, data):
 # 사용자 입력 분류
 def classify_input(user_input):
     """사용자의 입력을 '정보 요청' 또는 '코스 추천'으로 분류"""
-    keywords_info = ["주소", "전화번호", "평점", "리뷰"]
+    keywords_info = ["주소", "전화번호", "평점", "즐겨찾기"]
     keywords_recommend = ["추천", "코스", "여행지", "가볼 만한 곳", "명소"]
 
     if any(keyword in user_input for keyword in keywords_info):
