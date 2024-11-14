@@ -5,17 +5,30 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from openai import OpenAI
 
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST")
+ELASTIC_USERNAME = os.getenv("ELASTIC_USERNAME")
+ELASTIC_PASSWORD = os.getenv("ELASTIC_PASSWORD")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 # OpenAI API 설정
-API_KEY = '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'
-client = OpenAI(api_key=API_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # PostgreSQL DB 설정
 DB_CONFIG = {
-    "user": "daebbang",
-    "password": "apvmf0462",
-    "dbname": "postgres",
-    "host": "k11b105.p.ssafy.io",
-    "port": 5444,
+    "user": POSTGRES_USER,
+    "password": POSTGRES_PASSWORD,
+    "dbname": POSTGRES_DB,
+    "host": POSTGRES_HOST,
+    "port": POSTGRES_PORT,
 }
 
 # 라우터 생성
@@ -45,8 +58,7 @@ def load_all_data():
         # 모든 데이터를 하나의 데이터프레임으로 결합
         data = pd.concat(all_data, ignore_index=True)
 
-        # 벡터 데이터를 문자열에서 numpy 배열로 변환
-        data['embedding'] = data['embedding'].apply(lambda x: np.array(eval(x)) if isinstance(x, str) else x)
+        # 벡터 데이터는 이미 VECTOR 타입으로 처리되므로 별도 변환 불필요
         return data
     except Exception as e:
         print(f"Error loading data: {e}")
