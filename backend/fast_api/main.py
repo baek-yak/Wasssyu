@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
-from routers.recommendation import recommendation_router
+# from routers.recommendation import recommendation_router
 from routers.bakeryrouter import bakeryrouter
 from routers.chat_router import chat_router
 from routers.course_router import course_router
@@ -19,7 +19,7 @@ app.add_middleware(
 )
 
 # 라우터 연결
-app.include_router(recommendation_router, prefix="/fast_api")
+# app.include_router(recommendation_router, prefix="/fast_api")
 app.include_router(bakeryrouter, prefix='/fast_api')
 app.include_router(chat_router, prefix='/fast_api')
 app.include_router(course_router, prefix='/fast_api')

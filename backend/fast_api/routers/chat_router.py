@@ -1,34 +1,17 @@
 from fastapi import APIRouter, HTTPException
-import psycopg2
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from openai import OpenAI
-
 from dotenv import load_dotenv
 import os
+from db_conect import connect_to_db
 
 load_dotenv()
 
-# 환경 변수 로드
-POSTGRES_USER = os.getenv("POSTGRES_USER")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-POSTGRES_DB = os.getenv("POSTGRES_DB")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT")
-POSTGRES_HOST = os.getenv("POSTGRES_HOST")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
 # OpenAI API 설정
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
-
-# PostgreSQL DB 설정
-DB_CONFIG = {
-    "user": POSTGRES_USER,
-    "password": POSTGRES_PASSWORD,
-    "dbname": POSTGRES_DB,
-    "host": POSTGRES_HOST,
-    "port": POSTGRES_PORT,
-}
 
 # 라우터 생성
 chat_router = APIRouter()
@@ -36,23 +19,21 @@ chat_router = APIRouter()
 # PostgreSQL에서 데이터 로드
 def load_all_data():
     """tourist_spot_entity 테이블에서 데이터 로드"""
+    query = """
+    SELECT 
+        spot_name AS name,
+        spot_address AS address,
+        spot_description AS description,
+        phone,
+        embedding,
+        rating,
+        favorites_count
+    FROM tourist_spot_entity;
+    """
     try:
-        conn = psycopg2.connect(**DB_CONFIG)
-        query = """
-        SELECT 
-            spot_name AS name,
-            spot_address AS address,
-            spot_description AS description,
-            phone,
-            embedding,
-            rating,
-            favorites_count
-        FROM tourist_spot_entity;
-        """
-        data = pd.read_sql_query(query, conn)
-        conn.close()
-
-        # 벡터 데이터가 이미 vector 타입으로 저장되어 있으므로 변환 불필요
+        connection = connect_to_db()  # connect_to_db 사용
+        data = pd.read_sql_query(query, connection)
+        connection.close()
         return data
     except Exception as e:
         print(f"Error loading data: {e}")
@@ -64,7 +45,7 @@ def generate_user_embedding(user_input):
     try:
         response = client.embeddings.create(
             input=user_input,
-            model="text-embedding-ada-002"
+            model="text-embedding-3-large"
         )
         return np.array(response.data[0].embedding)
     except Exception as e:
