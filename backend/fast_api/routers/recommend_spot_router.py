@@ -1,24 +1,22 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 import psycopg2
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from openai import OpenAI
-from pydantic import BaseModel
-from typing import Optional, List
 
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
 
-# 환경 변수 로드
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_DB = os.getenv("POSTGRES_DB")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")
+ELASTIC_USERNAME = os.getenv("ELASTIC_USERNAME")
+ELASTIC_PASSWORD = os.getenv("ELASTIC_PASSWORD")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # OpenAI API 설정
@@ -32,13 +30,6 @@ DB_CONFIG = {
     "host": POSTGRES_HOST,
     "port": POSTGRES_PORT,
 }
-
-
-class UserInput(BaseModel):
-    user_input: str
-    latitude: Optional[float] = None  # 위도 (선택 사항)
-    longitude: Optional[float] = None  # 경도 (선택 사항)
-    preferred_types: Optional[List[str]] = None  # 선호하는 장소 유형 (선택 사항)
 
 # 라우터 생성
 recommend_router = APIRouter()
@@ -118,18 +109,14 @@ def recommend_places(user_input):
 
 # 추천 엔드포인트
 @recommend_router.post("/recommend")
-def get_recommendations(input_data: UserInput):
+def get_recommendations(user_input: str):
     """
     사용자의 입력을 기반으로 장소를 추천
+    :param user_input: 사용자 입력 텍스트
+    :return: 추천 장소 리스트
     """
     try:
-        user_input = input_data.user_input
-        latitude = input_data.latitude
-        longitude = input_data.longitude
-        preferred_types = input_data.preferred_types
-
-        # 장소 추천 함수 호출
-        recommendations = recommend_places(user_input, latitude, longitude, preferred_types)
+        recommendations = recommend_places(user_input)
         return {"recommendations": recommendations}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
