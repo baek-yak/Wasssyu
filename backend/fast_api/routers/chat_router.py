@@ -5,13 +5,20 @@ import numpy as np
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+import psycopg2
 import json
-from db_conect import connect_to_db
 
 load_dotenv()
 
-# OpenAI API 설정
+# 환경 변수 로드
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# OpenAI API 설정
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 라우터 생성
@@ -32,7 +39,13 @@ def load_all_data():
     FROM tourist_spot_entity;
     """
     try:
-        connection = connect_to_db()  # connect_to_db 사용
+        connection = psycopg2.connect(
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
+            dbname=POSTGRES_DB,
+            host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
+        )
         data = pd.read_sql_query(query, connection)
         connection.close()
         return data
