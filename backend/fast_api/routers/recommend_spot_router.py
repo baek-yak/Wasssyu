@@ -59,12 +59,16 @@ def load_spots_from_db():
         data = pd.read_sql_query(query, conn)
         conn.close()
 
-        # 문자열로 저장된 벡터를 numpy 배열로 변환
+        # 누락된 벡터 제거
+        data = data.dropna(subset=["embedding"])
         data["embedding"] = data["embedding"].apply(lambda x: np.array(eval(x)) if isinstance(x, str) else x)
+
+        # 일관된 형상 유지
+        data = data[data["embedding"].apply(lambda x: x.shape[0] if isinstance(x, np.ndarray) else 0) == 768]
+
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
 # 사용자 입력 임베딩 생성
 def generate_user_embedding(user_input):
     """OpenAI를 사용하여 사용자 입력을 벡터 임베딩으로 변환"""
