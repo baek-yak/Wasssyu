@@ -5,6 +5,8 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from openai import OpenAI
+from pydantic import BaseModel
+from typing import Optional, List
 
 from dotenv import load_dotenv
 import os
@@ -31,9 +33,12 @@ DB_CONFIG = {
     "port": POSTGRES_PORT,
 }
 
-# Pydantic 모델 정의
+
 class UserInput(BaseModel):
     user_input: str
+    latitude: Optional[float] = None  # 위도 (선택 사항)
+    longitude: Optional[float] = None  # 경도 (선택 사항)
+    preferred_types: Optional[List[str]] = None  # 선호하는 장소 유형 (선택 사항)
 
 # 라우터 생성
 recommend_router = APIRouter()
@@ -116,11 +121,15 @@ def recommend_places(user_input):
 def get_recommendations(input_data: UserInput):
     """
     사용자의 입력을 기반으로 장소를 추천
-    :param input_data: 사용자 입력 텍스트
-    :return: 추천 장소 리스트
     """
     try:
-        recommendations = recommend_places(input_data.user_input)
+        user_input = input_data.user_input
+        latitude = input_data.latitude
+        longitude = input_data.longitude
+        preferred_types = input_data.preferred_types
+
+        # 장소 추천 함수 호출
+        recommendations = recommend_places(user_input, latitude, longitude, preferred_types)
         return {"recommendations": recommendations}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
