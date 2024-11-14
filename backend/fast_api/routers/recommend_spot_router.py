@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 import psycopg2
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
@@ -10,13 +11,12 @@ import os
 
 load_dotenv()
 
+# 환경 변수 로드
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_DB = os.getenv("POSTGRES_DB")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")
-ELASTIC_USERNAME = os.getenv("ELASTIC_USERNAME")
-ELASTIC_PASSWORD = os.getenv("ELASTIC_PASSWORD")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # OpenAI API 설정
@@ -30,6 +30,10 @@ DB_CONFIG = {
     "host": POSTGRES_HOST,
     "port": POSTGRES_PORT,
 }
+
+# Pydantic 모델 정의
+class UserInput(BaseModel):
+    user_input: str
 
 # 라우터 생성
 recommend_router = APIRouter()
@@ -109,14 +113,14 @@ def recommend_places(user_input):
 
 # 추천 엔드포인트
 @recommend_router.post("/recommend")
-def get_recommendations(user_input: str):
+def get_recommendations(input_data: UserInput):
     """
     사용자의 입력을 기반으로 장소를 추천
-    :param user_input: 사용자 입력 텍스트
+    :param input_data: 사용자 입력 텍스트
     :return: 추천 장소 리스트
     """
     try:
-        recommendations = recommend_places(user_input)
+        recommendations = recommend_places(input_data.user_input)
         return {"recommendations": recommendations}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
