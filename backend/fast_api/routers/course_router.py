@@ -44,7 +44,6 @@ def get_courses():
     courses = [dict(row) for row in data]
     return courses
 
-# 특정 코스의 상세 정보 조회
 @course_router.get("/courses/{course_id}")
 def get_course_details(course_id: int):
     """특정 코스의 상세 정보를 반환"""
@@ -59,9 +58,9 @@ def get_course_details(course_id: int):
     if not course_data:
         raise HTTPException(status_code=404, detail=f"Course with ID {course_id} not found")
 
-    # 코스에 포함된 빵집 정보 가져오기
+    # 코스에 포함된 빵집 정보 가져오기 (중복 제거)
     details_query = """
-        SELECT 
+        SELECT DISTINCT ON (tse.spot_name)
             tse.spot_name AS bakery_name, 
             tse.spot_address AS address, 
             tse.rating, 
@@ -76,6 +75,7 @@ def get_course_details(course_id: int):
         LEFT JOIN tourist_spot_image_entity AS tsie
         ON tse.id = tsie.tourist_spot_entity_id
         WHERE tcde.course_id = %s
+        ORDER BY tse.spot_name, tsie.tourist_spot_image_url
     """
     details_data = fetch_data(details_query, params=[course_id])
 
