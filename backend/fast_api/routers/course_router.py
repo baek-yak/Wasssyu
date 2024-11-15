@@ -1,14 +1,17 @@
+from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 import psycopg2
 import psycopg2.extras
+import os
 
+load_dotenv()
 # PostgreSQL DB 설정
 DB_CONFIG = {
-    "user": "daebbang",
-    "password": "apvmf0462",
-    "dbname": "postgres",
-    "host": "k11b105.p.ssafy.io",
-    "port": 5444,
+    "user": os.environ.get("POSTGRES_USER"),
+    "password": os.environ.get("POSTGRES_PASSWORD"),
+    "dbname": os.environ.get("POSTGRES_DB"),
+    "host": os.environ.get("POSTGRES_HOST"),
+    "port": os.environ.get("POSTGRES_PORT"),
 }
 
 # 라우터 생성
