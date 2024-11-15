@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Request
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
-import logging
+from jwt_middleware import JWTMiddleware
+from jwt_handler import JWTHandler
 from dotenv import load_dotenv
 from routers.bakeryrouter import bakeryrouter
 from routers.chat_router import chat_router
@@ -25,6 +26,12 @@ app.add_middleware(
     allow_headers=["*"],  # 모든 헤더 허용
 )
 
+# JWT 미들웨어 추가
+app.add_middleware(JWTMiddleware)
+
+# JWT 핸들러 인스턴스 생성
+jwt_handler = JWTHandler()
+
 # 라우터 연결
 app.include_router(bakeryrouter, prefix='/fast_api')
 app.include_router(chat_router, prefix='/fast_api')
@@ -43,7 +50,6 @@ def read_root():
 def global_exception_handler(request: Request, exc: Exception):
     print(f"Unhandled exception occurred: {exc}")
     return {"detail": "서버 내부 오류가 발생했습니다. 관리자에게 문의하세요.", "error": str(exc)}
-
 
 if __name__ == "__main__":
     print("Starting FastAPI server...")
