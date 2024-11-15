@@ -34,7 +34,15 @@ class JWTHandler:
 
     def verify_token(self, token: str) -> str:
         try:
+            logger.info(f"Token: {token}")
+            print(f"""
+                    SECRET KEY : {self.secret_key}
+                    ALGORITHM : {self.algorithm}
+                """)
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            print(f"""
+                    payload : {payload}
+                    """)
             return payload['sub']
         except jwt.ExpiredSignatureError as e:
             logger.error(f"Token expired: {str(e)}")
