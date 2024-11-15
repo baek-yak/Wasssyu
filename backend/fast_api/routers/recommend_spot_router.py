@@ -5,18 +5,46 @@ import json
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
-from db_conect import connect_to_db
+import psycopg2
 from psycopg2.extras import RealDictCursor
 
-# 환경 변수 로드
+# .env 파일 로드
 load_dotenv()
 
 # OpenAI API 설정
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
+# PostgreSQL DB 설정
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST")
+
 # 라우터 생성
 recommend_router = APIRouter()
+
+# PostgreSQL 연결 함수
+def connect_to_db():
+    """
+    PostgreSQL 데이터베이스에 연결합니다.
+
+    :return: psycopg2.Connection 객체
+    """
+    try:
+        connection = psycopg2.connect(
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
+            dbname=POSTGRES_DB,
+            host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
+        )
+        print("Database connection successful.")
+        return connection
+    except psycopg2.Error as e:
+        print(f"Error connecting to the database: {e}")
+        raise HTTPException(status_code=500, detail="Database connection failed.")
 
 def get_openai_embedding(text):
     """
