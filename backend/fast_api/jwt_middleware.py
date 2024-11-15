@@ -1,3 +1,4 @@
+# jwt_middleware.py
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
@@ -11,41 +12,94 @@ class JWTMiddleware(BaseHTTPMiddleware):
             "/fast_api/docs",
             "/fast_api/openapi.json",
             "/",
-            "/fast_api/auth/login",  # 로그인 엔드포인트가 있다면
-            "/fast_api/auth/register"  # 회원가입 엔드포인트가 있다면
+            "/fast_api/auth/login",
+            "/fast_api/auth/register"
         ]
 
-        # 현재 경로가 제외 경로에 포함되어 있으면 미들웨어 스킵
-        if request.url.path in exclude_paths:
+        if any(request.url.path.startswith(path) for path in exclude_paths):
             return await call_next(request)
 
-        # Authorization 헤더 확인
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Invalid authentication credentials"}
-            )
-
         try:
-            # Token 추출 및 검증
+            auth_header = request.headers.get('Authorization')
+            if not auth_header:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "No authorization header"}
+                )
+
+            if not auth_header.startswith('Bearer '):
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Invalid authorization header"}
+                )
+
             token = auth_header.split(' ')[1]
-            payload = jwt.decode(
-                token,
-                getenv("SECRET_KEY"),
-                algorithms=[getenv("ALGORITHM")]
-            )
-            # request state에 user 정보 저장
-            request.state.user = payload['sub']
-        except jwt.ExpiredSignatureError:
+            try:
+                payload = jwt.decode(
+                    token,
+                    getenv("SECRET_KEY"),
+                    algorithms=[getenv("ALGORITHM")]
+                )
+                request.state.user = payload.get('sub')
+            except jwt.ExpiredSignatureError:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Token has expired"}
+                )
+            except jwt.InvalidTokenError:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Invalid token"}
+                )
+            
+            return await call_next(request)
+            
+        except Exception as e:
             return JSONResponse(
-                status_code=401,
-                content={"detail": "Token has expired"}
-            )
-        except jwt.InvalidTokenError:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Invalid token"}
+                status_code=500,
+                content={"detail": f"Internal server error: {str(e)}"}
             )
 
-        return await call_next(request)
+# jwt_handler.py
+from fastapi import HTTPException, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from datetime import datetime, timedelta
+import jwt
+from os import getenv
+from typing import Optional
+
+class JWTHandler:
+    def __init__(self):
+        self.secret_key = getenv("SECRET_KEY")
+        self.algorithm = getenv("ALGORITHM")
+        self.security = HTTPBearer()
+
+    def create_token(self, user_id: str) -> str:
+        try:
+            payload = {
+                'exp': datetime.utcnow() + timedelta(days=1),
+                'iat': datetime.utcnow(),
+                'sub': user_id
+            }
+            token = jwt.encode(
+                payload,
+                self.secret_key,
+                algorithm=self.algorithm
+            )
+            return token
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error creating token: {str(e)}")
+
+    def verify_token(self, token: str) -> Optional[str]:
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            return payload.get('sub')
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail='Token has expired')
+        except jwt.InvalidTokenError:
+            raise HTTPException(status_code=401, detail='Invalid token')
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error verifying token: {str(e)}")
+
+    async def get_current_user(self, auth: HTTPAuthorizationCredentials = Security(HTTPBearer())) -> str:
+        return self.verify_token(auth.credentials)
