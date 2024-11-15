@@ -40,9 +40,6 @@ class JWTHandler:
         try:
             logger.info(f"Token: {token}")
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
-            print(f"""
-                    payload : {payload}
-                    """)
             return payload['sub']
         except jwt.ExpiredSignatureError as e:
             logger.error(f"Token expired: {str(e)}")
@@ -61,9 +58,6 @@ class JWTHandler:
         try:
             logger.debug("Attempting to get current user")
             token = credentials.credentials
-            print(f"""
-                    Get current user token : {token}
-                """)
             user_id = self.verify_token(token)
             logger.debug(f"Successfully got user: {user_id}")
             return user_id

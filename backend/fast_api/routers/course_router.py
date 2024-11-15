@@ -1,11 +1,14 @@
+from ast import expr_context
 from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from dependencies.dependencies import get_current_user
+from jwt_handler import logger
 import psycopg2
 import psycopg2.extras
 import os
 
+
 load_dotenv()
-# PostgreSQL DB 설정
 DB_CONFIG = {
     "user": os.environ.get("POSTGRES_USER"),
     "password": os.environ.get("POSTGRES_PASSWORD"),
@@ -33,62 +36,89 @@ def fetch_data(query, params=None):
 # 코스 목록 조회
 @course_router.get("/courses")
 def get_courses():
-    """모든 코스 목록을 반환"""
-    query = """
-        SELECT id, course_name, description, image_url
-        FROM tour_course
-    """
-    data = fetch_data(query)
+    try: 
+        """모든 코스 목록을 반환"""
+        query = """
+            SELECT id, course_name, description, image_url
+            FROM tour_course
+        """
+        data = fetch_data(query)
+        
+        print(f"{current_user} ----------------------")
 
-    if not data:
-        raise HTTPException(status_code=404, detail="No courses found")
+        if not data:
+            raise HTTPException(status_code=404, detail="No courses found")
 
-    # 데이터를 Dict 형태로 변환
-    courses = [dict(row) for row in data]
-    return courses
+        # 데이터를 Dict 형태로 변환
+        courses = [dict(row) for row in data]
+        return courses
+    
+    except Exception as e:
+        print(f"ERROR: {e}")
+        logger.error(f"Error in Get course: {e}")
 
 @course_router.get("/courses/{course_id}")
-def get_course_details(course_id: int):
-    """특정 코스의 상세 정보를 반환"""
-    # 코스 정보 가져오기
-    course_query = """
-        SELECT id, course_name, description, image_url
-        FROM tour_course
-        WHERE id = %s
-    """
-    course_data = fetch_data(course_query, params=[course_id])
+def get_course_details(course_id: int, current_user=Depends(get_current_user)):
+    try : 
+        """특정 코스의 상세 정보를 반환"""
+        # 코스 정보 가져오기
+        course_query = """
+            SELECT id, course_name, description, image_url
+            FROM tour_course
+            WHERE id = %s
+        """
+        course_data = fetch_data(course_query, params=[course_id])
+        
+        user_course_progress_query = """
+            SELECT ucp.*
+            FROM user_course_progress ucp
+            JOIN tour_course tc ON ucp.tour_course_id = tc.id
+            WHERE ucp.user_id = (SELECT id FROM user_entity WHERE email = %s)
+            AND tc.id = %s;
+        """
 
-    if not course_data:
-        raise HTTPException(status_code=404, detail=f"Course with ID {course_id} not found")
+        if not course_data:
+            raise HTTPException(status_code=404, detail=f"Course with ID {course_id} not found")
 
-    # 코스에 포함된 빵집 정보 가져오기 (중복 제거)
-    details_query = """
-        SELECT DISTINCT ON (tse.spot_name)
-            tse.spot_name AS bakery_name, 
-            tse.spot_address AS address, 
-            tse.rating, 
-            tse.phone, 
-            tse.business_hours, 
-            tse.elastic_id,
-            tse.spot_description AS description,
-            tsie.tourist_spot_image_url AS image_url
-        FROM tour_course_details_entity AS tcde
-        JOIN tourist_spot_entity AS tse
-        ON tcde.bakery_id = tse.id
-        LEFT JOIN tourist_spot_image_entity AS tsie
-        ON tse.id = tsie.tourist_spot_entity_id
-        WHERE tcde.course_id = %s
-        ORDER BY tse.spot_name, tsie.tourist_spot_image_url
-    """
-    details_data = fetch_data(details_query, params=[course_id])
+        # 코스에 포함된 빵집 정보 가져오기 (중복 제거)
+        details_query = """
+            SELECT DISTINCT ON (tse.spot_name)
+                tse.spot_name AS bakery_name, 
+                tse.spot_address AS address, 
+                tse.rating, 
+                tse.phone, 
+                tse.business_hours, 
+                tse.elastic_id,
+                tse.spot_description AS description,
+                tsie.tourist_spot_image_url AS image_url
+            FROM tour_course_details_entity AS tcde
+            JOIN tourist_spot_entity AS tse
+            ON tcde.bakery_id = tse.id
+            LEFT JOIN tourist_spot_image_entity AS tsie
+            ON tse.id = tsie.tourist_spot_entity_id
+            WHERE tcde.course_id = %s
+            ORDER BY tse.spot_name, tsie.tourist_spot_image_url
+        """
+        details_data = fetch_data(details_query, params=[course_id])
 
-    if not details_data:
-        raise HTTPException(status_code=404, detail=f"No spots found for course ID {course_id}")
+        if not details_data:
+            raise HTTPException(status_code=404, detail=f"No spots found for course ID {course_id}")
 
-    # 코스 정보와 빵집 정보 결합
-    response = {
-        "course": dict(course_data[0]),
-        "bakeries": [dict(row) for row in details_data]
-    }
+        # 코스 정보와 빵집 정보 결합
+        response = {
+            "course": dict(course_data[0]),
+            "bakeries": [dict(row) for row in details_data]
+        }
+        
+        progress_data = fetch_data(user_course_progress_query, params=[current_user, course_id])
+        print(f"Target : {progress_data}")
+        
+        if progress_data:
+            response["course"]["progress"] = progress_data[0][-1]
+        else:
+            response["course"]["progress"] = "yet"
 
-    return response
+        return response
+    except Exception as e:
+        print(f"Error in course detail: {e}")
+        logger.error(f"Error in course detail: {e}")
