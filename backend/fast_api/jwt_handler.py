@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import jwt
 from os import getenv
 import logging
+import pdb
 
 # 로깅 설정
 logging.basicConfig(level=logging.DEBUG)
@@ -36,9 +37,11 @@ class JWTHandler:
         try:
             logger.info(f"Token: {token}")
             print(f"""
+                    TOKEN : {token}
                     SECRET KEY : {self.secret_key}
                     ALGORITHM : {self.algorithm}
                 """)
+            pdb.set_trace()
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
             print(f"""
                     payload : {payload}
@@ -48,16 +51,24 @@ class JWTHandler:
             logger.error(f"Token expired: {str(e)}")
             raise HTTPException(status_code=401, detail='Token has expired')
         except jwt.InvalidTokenError as e:
+            print(f"""
+                    Invalid ERROR : {e}
+                """)
             logger.error(f"Invalid token: {str(e)}")
+            logger.debug(f"Failed to decode JWT with secret: {self.secret_key}, algorithm: {self.algorithm}")
+            logger.debug("Traceback:", exc_info=True)
             raise HTTPException(status_code=401, detail='Invalid token')
         except Exception as e:
             logger.error(f"Error verifying token: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error verifying token: {str(e)}")
 
-    async def get_current_user(self, credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())) -> str:
+    def get_current_user(self, credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())) -> str:
         try:
             logger.debug("Attempting to get current user")
             token = credentials.credentials
+            print(f"""
+                    Get current user token : {token}
+                """)
             user_id = self.verify_token(token)
             logger.debug(f"Successfully got user: {user_id}")
             return user_id
