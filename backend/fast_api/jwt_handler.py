@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 import jwt
 from os import getenv
 import logging
-import pdb
 import base64
 
 # 로깅 설정
@@ -37,12 +36,6 @@ class JWTHandler:
     def verify_token(self, token: str) -> str:
         try:
             logger.info(f"Token: {token}")
-            print(f"""
-                    TOKEN : {token}
-                    SECRET KEY : {self.secret_key}
-                    ALGORITHM : {self.algorithm}
-                """)
-            pdb.set_trace()
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
             print(f"""
                     payload : {payload}
@@ -56,8 +49,6 @@ class JWTHandler:
                     Invalid ERROR : {e}
                 """)
             logger.error(f"Invalid token: {str(e)}")
-            logger.debug(f"Failed to decode JWT with secret: {self.secret_key}, algorithm: {self.algorithm}")
-            logger.debug("Traceback:", exc_info=True)
             raise HTTPException(status_code=401, detail='Invalid token')
         except Exception as e:
             logger.error(f"Error verifying token: {str(e)}")
