@@ -79,12 +79,12 @@ psutil==6.0.0
 psycopg2-binary==2.9.10
 ptyprocess==0.7.0
 pure_eval==0.2.3
+py==1.11.0
 pycparser==2.22
 pydantic==2.9.2
 pydantic-settings==2.6.1
 pydantic_core==2.23.4
 Pygments==2.18.0
-PyJWT==2.9.0
 pyparsing==3.2.0
 PySocks==1.7.1
 python-dateutil==2.9.0
