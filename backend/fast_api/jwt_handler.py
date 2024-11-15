@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from datetime import datetime, timedelta
@@ -9,6 +10,8 @@ import base64
 # 로깅 설정
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+load_dotenv()
 
 class JWTHandler:
     def __init__(self):

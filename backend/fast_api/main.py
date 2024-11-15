@@ -76,6 +76,8 @@ app.include_router(
     dependencies=[Depends(jwt_handler.get_current_user)]
 )
 
+
+
 @app.get("/", tags=["Root"])
 def read_root():
     return {"message": "Welcome to the Travel Recommendation API"}
