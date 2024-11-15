@@ -1,11 +1,13 @@
-from fastapi import HTTPException, Security, Depends
+from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from datetime import datetime, timedelta
 import jwt
 from os import getenv
-from dotenv import load_dotenv
+import logging
 
-load_dotenv()
+# 로깅 설정
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class JWTHandler:
     def __init__(self):
@@ -13,26 +15,44 @@ class JWTHandler:
         self.algorithm = getenv("ALGORITHM")
         self.security = HTTPBearer()
 
-    def create_token(self, user_id: str):
-        payload = {
-            'exp': datetime.utcnow() + timedelta(days=1),
-            'iat': datetime.utcnow(),
-            'sub': user_id
-        }
-        return jwt.encode(
-            payload,
-            self.secret_key,
-            algorithm=self.algorithm
-        )
+    def create_token(self, user_id: str) -> str:
+        try:
+            payload = {
+                'exp': datetime.utcnow() + timedelta(days=1),
+                'iat': datetime.utcnow(),
+                'sub': user_id
+            }
+            token = jwt.encode(
+                payload,
+                self.secret_key,
+                algorithm=self.algorithm
+            )
+            return token
+        except Exception as e:
+            logger.error(f"Error creating token: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error creating token: {str(e)}")
 
-    def decode_token(self, token: str):
+    def verify_token(self, token: str) -> str:
         try:
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
             return payload['sub']
-        except jwt.ExpiredSignatureError:
+        except jwt.ExpiredSignatureError as e:
+            logger.error(f"Token expired: {str(e)}")
             raise HTTPException(status_code=401, detail='Token has expired')
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as e:
+            logger.error(f"Invalid token: {str(e)}")
             raise HTTPException(status_code=401, detail='Invalid token')
+        except Exception as e:
+            logger.error(f"Error verifying token: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error verifying token: {str(e)}")
 
-    def auth_wrapper(self, auth: HTTPAuthorizationCredentials = Security(HTTPBearer())):
-        return self.decode_token(auth.credentials)
+    async def get_current_user(self, credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())) -> str:
+        try:
+            logger.debug("Attempting to get current user")
+            token = credentials.credentials
+            user_id = self.verify_token(token)
+            logger.debug(f"Successfully got user: {user_id}")
+            return user_id
+        except Exception as e:
+            logger.error(f"Error in get_current_user: {str(e)}")
+            raise
