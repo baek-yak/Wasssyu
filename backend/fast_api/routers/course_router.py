@@ -70,11 +70,11 @@ def get_course_details(course_id: int, current_user=Depends(get_current_user)):
         course_data = fetch_data(course_query, params=[course_id])
         
         user_course_progress_query = """
-            SELECT EXISTS (
-                SELECT 1
-                FROM user_course_progress
-                WHERE user_id = (SELECT id FROM user_entity WHERE email = %s)
-            )
+            SELECT ucp.*
+            FROM user_course_progress ucp
+            JOIN tour_course tc ON ucp.tour_course_id = tc.id
+            WHERE ucp.user_id = (SELECT id FROM user_entity WHERE email = %s)
+            AND tc.id = %s;
         """
 
         if not course_data:
@@ -109,6 +109,14 @@ def get_course_details(course_id: int, current_user=Depends(get_current_user)):
             "course": dict(course_data[0]),
             "bakeries": [dict(row) for row in details_data]
         }
+        
+        progress_data = fetch_data(user_course_progress_query, params=[current_user, course_id])
+        print(f"Target : {progress_data}")
+        
+        if progress_data:
+            response["course"]["progress"] = progress_data[0][-1]
+        else:
+            response["course"]["progress"] = "yet"
 
         return response
     except Exception as e:
