@@ -5,6 +5,7 @@ import jwt
 from os import getenv
 import logging
 import pdb
+import base64
 
 # 로깅 설정
 logging.basicConfig(level=logging.DEBUG)
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class JWTHandler:
     def __init__(self):
-        self.secret_key = getenv("SECRET_KEY")
+        self.secret_key = base64.b64decode(getenv("SECRET_KEY"))
         self.algorithm = getenv("ALGORITHM")
         self.security = HTTPBearer()
 
