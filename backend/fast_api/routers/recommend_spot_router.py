@@ -1,40 +1,36 @@
-from fastapi import APIRouter, HTTPException
-import pandas as pd
+from fastapi import APIRouter, HTTPException, Query
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+import json
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
 import psycopg2
-import json
+from psycopg2.extras import RealDictCursor
 
+# .env 파일 로드
 load_dotenv()
 
-# 환경 변수 로드
+# OpenAI API 설정
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+# PostgreSQL DB 설정
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_DB = os.getenv("POSTGRES_DB")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# OpenAI API 설정
-client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 라우터 생성
-chat_router = APIRouter()
+recommend_router = APIRouter()
 
-# PostgreSQL에서 데이터 로드
-def load_all_data():
-    """tourist_spot_entity 테이블에서 데이터 로드"""
-    query = """
-    SELECT 
-        spot_name AS name,
-        spot_address AS address,
-        spot_description AS description,
-        phone,
-        embedding
-    FROM tourist_spot_entity;
+# PostgreSQL 연결 함수
+def connect_to_db():
+    """
+    PostgreSQL 데이터베이스에 연결합니다.
+
+    :return: psycopg2.Connection 객체
     """
     try:
         connection = psycopg2.connect(
@@ -44,135 +40,110 @@ def load_all_data():
             host=POSTGRES_HOST,
             port=POSTGRES_PORT,
         )
-        data = pd.read_sql_query(query, connection)
-        connection.close()
+        print("Database connection successful.")
+        return connection
+    except psycopg2.Error as e:
+        print(f"Error connecting to the database: {e}")
+        raise HTTPException(status_code=500, detail="Database connection failed.")
 
-        # `embedding`이 JSON 문자열로 저장된 경우 변환
-        data['embedding'] = data['embedding'].apply(
-            lambda x: np.array(json.loads(x), dtype=np.float32) if isinstance(x, str) else x
-        )
-        return data
-    except Exception as e:
-        print(f"Error loading data: {e}")
-        return pd.DataFrame()
-
-# 사용자 입력 임베딩 생성
-def generate_user_embedding(user_input):
-    """사용자 입력을 임베딩으로 변환"""
-    try:
-        response = client.embeddings.create(
-            input=user_input,
-            model="text-embedding-3-large"
-        )
-        return np.array(response.data[0].embedding)
-    except Exception as e:
-        print(f"Error generating embedding for user input: {e}")
-        return None
-
-# 코스 추천 처리
-def handle_course_recommendation(user_input, data, filters=None):
-    """코스 추천 처리 함수"""
-    user_embedding = generate_user_embedding(user_input)
-    if user_embedding is None:
-        return "사용자 입력 임베딩 생성에 실패했습니다."
-
-    embeddings = np.stack(data['embedding'].to_numpy())
-    similarities = cosine_similarity([user_embedding], embeddings)[0]
-    data['similarity'] = similarities
-
-    if filters:
-        if 'min_rating' in filters:
-            data = data[data['rating'] >= filters['min_rating']]
-        if 'min_favorites' in filters:
-            data = data[data['favorites_count'] >= filters['min_favorites']]
-
-    recommended = data.sort_values(by='similarity', ascending=False).head(5)
-    return recommended[['name', 'address', 'rating', 'favorites_count', 'phone']]
-
-# 정보 요청 처리
-def handle_info_request(user_input, data):
-    """정보 요청 처리"""
-    for idx, row in data.iterrows():
-        if row['name'] in user_input:
-            if "주소" in user_input:
-                return f"{row['name']}의 주소는 {row['address']}입니다."
-            elif "평점" in user_input:
-                return f"{row['name']}의 평점은 {row['rating']}입니다."
-            elif "즐겨찾기" in user_input:
-                return f"{row['name']}의 즐겨찾기 수는 {row['favorites_count']}개입니다."
-            elif "전화" in user_input:
-                return f"{row['name']}의 전화번호는 {row['phone']}입니다."
-            
-    return "해당 정보를 찾을 수 없습니다."
-
-# 자연스러운 응답 생성
-def generate_natural_response(user_input, result):
-    """OpenAI GPT를 사용해 자연스러운 응답 생성"""
-    prompt = f"""
-    사용자의 질문: {user_input}
-    결과: {result}
-
-    위 결과를 기반으로 사용자에게 친근하고 자연스러운 대화체로 답변을 작성하세요.
+def get_openai_embedding(text):
+    """
+    OpenAI API를 사용하여 텍스트 임베딩을 생성합니다.
+    
+    :param text: 사용자 입력 텍스트
+    :return: 1536차원 임베딩 벡터 (numpy array)
     """
     try:
-        completion = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "당신은 여행 정보와 추천을 제공하는 전문 챗봇입니다."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=3000,
-            temperature=0.7
+        response = client.embeddings.create(
+            input=text,
+            model="text-embedding-3-large"
         )
-        return completion.choices[0].message.content
+        embedding = response.data[0].embedding
+        return np.array(embedding, dtype=np.float32)
     except Exception as e:
-        print(f"OpenAI API 호출 중 오류가 발생했습니다: {e}")
-        return "죄송합니다. 요청을 처리하는 중 문제가 발생했습니다."
+        raise HTTPException(status_code=500, detail=f"Error fetching embedding from OpenAI: {e}")
 
-# 사용자 입력 처리
-def process_user_input(user_input, data):
-    """사용자 입력을 처리하고 PostgreSQL 데이터를 활용"""
-    if data.empty:
-        return "테이블 데이터를 로드하는 데 실패했습니다."
+def fetch_tourist_spots_from_db():
+    """
+    데이터베이스에서 관광지 데이터를 가져옵니다.
+    
+    :return: 관광지 데이터 리스트
+    """
+    query = """
+    SELECT 
+        tse.id,
+        tse.spot_name,
+        tse.spot_address,
+        tse.spot_description,
+        tse.elastic_id,
+        tse.phone,
+        tse.daily_plan_entity_id,
+        tse.embedding,
+        tsie.tourist_spot_image_url
+    FROM 
+        tourist_spot_entity tse
+    LEFT JOIN 
+        tourist_spot_image_entity tsie
+    ON 
+        tse.id = tsie.tourist_spot_entity_id;
+    """
+    try:
+        connection = connect_to_db()
+        cursor = connection.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(query)
+        results = cursor.fetchall()
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching data from database: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
 
-    action = classify_input(user_input)
-    result = ""
+@recommend_router.post("/recommend")
+async def recommend_places(user_input: str = Query(..., description="Enter a description or keywords for the tourist spot")):
+    """
+    사용자 입력을 기반으로 가장 유사한 장소 10개를 반환합니다.
+    
+    :param user_input: 사용자 입력 텍스트
+    :return: 유사한 장소 데이터 리스트
+    """
+    try:
+        # 사용자 입력 임베딩
+        user_vector = get_openai_embedding(user_input)
+        
+        # DB에서 관광지 데이터 가져오기
+        spots = fetch_tourist_spots_from_db()
+        
+        # 관광지 데이터와 유사도 계산
+        similarities = []
+        for spot in spots:
+            if spot["embedding"] is not None:
+                try:
+                    # `embedding`이 JSON 문자열이라면 변환
+                    db_vector = np.array(json.loads(spot["embedding"]), dtype=np.float32)
+                except (TypeError, ValueError) as e:
+                    continue
+                
+                # 유사도 계산
+                similarity = cosine_similarity([user_vector], [db_vector])[0][0]
+                similarities.append({
+                    "id": spot["id"],
+                    "spot_name": spot["spot_name"],
+                    "spot_address": spot["spot_address"],
+                    "spot_description": spot["spot_description"],
+                    "elastic_id": spot["elastic_id"],
+                    "phone": spot["phone"],
+                    "daily_plan_entity_id": spot["daily_plan_entity_id"],
+                    "tourist_spot_image_url": spot["tourist_spot_image_url"],
+                    "similarity": similarity
+                })
+        
+        # 유사도로 정렬 후 상위 10개 반환
+        top_similar_places = sorted(similarities, key=lambda x: x["similarity"], reverse=True)[:10]
+        return {"results": top_similar_places}
 
-    if action == "코스 추천":
-        filters = {}
-        if "평점 높은" in user_input:
-            filters['min_rating'] = 4.0
-        if "즐겨찾기 많은" in user_input:
-            filters['min_favorites'] = 100
-        result = handle_course_recommendation(user_input, data, filters)
-        response = result.to_string(index=False)
-    elif action == "정보 요청":
-        result = handle_info_request(user_input, data)
-        response = result
-    else:
-        response = "입력을 이해하지 못했습니다. 다시 시도해주세요."
-
-    return generate_natural_response(user_input, response)
-
-# 사용자 입력 분류
-def classify_input(user_input):
-    """사용자의 입력을 '정보 요청' 또는 '코스 추천'으로 분류"""
-    keywords_info = ["주소", "전화번호", "평점", "즐겨찾기"]
-    keywords_recommend = ["추천", "코스", "여행지", "가볼 만한 곳", "명소"]
-
-    if any(keyword in user_input for keyword in keywords_info):
-        return "정보 요청"
-    elif any(keyword in user_input for keyword in keywords_recommend):
-        return "코스 추천"
-    else:
-        return "알 수 없음"
-
-# FastAPI 라우터 엔드포인트 정의
-@chat_router.post("/chat")
-async def chat_with_bot(user_input: str):
-    """사용자의 입력에 응답"""
-    data = load_all_data()
-    if data.empty:
-        raise HTTPException(status_code=500, detail="데이터 로드 실패")
-    response = process_user_input(user_input, data)
-    return {"response": response}
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in finding similar places: {e}")
