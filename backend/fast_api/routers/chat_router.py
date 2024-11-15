@@ -33,9 +33,7 @@ def load_all_data():
         spot_address AS address,
         spot_description AS description,
         phone,
-        embedding,
-        rating,
-        favorites_count
+        embedding
     FROM tourist_spot_entity;
     """
     try:
@@ -48,6 +46,11 @@ def load_all_data():
         )
         data = pd.read_sql_query(query, connection)
         connection.close()
+
+        # `embedding`이 JSON 문자열로 저장된 경우 변환
+        data['embedding'] = data['embedding'].apply(
+            lambda x: np.array(json.loads(x), dtype=np.float32) if isinstance(x, str) else x
+        )
         return data
     except Exception as e:
         print(f"Error loading data: {e}")
