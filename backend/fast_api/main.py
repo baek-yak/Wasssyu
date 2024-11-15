@@ -10,6 +10,7 @@ from routers.chat_router import chat_router
 from routers.course_router import course_router
 from routers.recommend_spot_router import recommend_router
 from routers.count_top_router import top_app
+from dependencies.dependencies import get_current_user
 
 # 로깅 설정
 logging.basicConfig(
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # JWT 핸들러 인스턴스 생성
-jwt_handler = JWTHandler()
+# jwt_handler = JWTHandler()
 
 # FastAPI 애플리케이션 설정
 app = FastAPI(
@@ -49,31 +50,31 @@ app.include_router(
     bakeryrouter,
     prefix='/fast_api',
     tags=["Bakery"],
-    dependencies=[Depends(jwt_handler.get_current_user)]
+    dependencies=[Depends(get_current_user)]
 )
 app.include_router(
     chat_router,
     prefix='/fast_api',
     tags=["Chat"],
-    dependencies=[Depends(jwt_handler.get_current_user)]
+    dependencies=[Depends(get_current_user)]
 )
 app.include_router(
     course_router,
     prefix='/fast_api',
     tags=["Course"],
-    dependencies=[Depends(jwt_handler.get_current_user)]
+    dependencies=[Depends(get_current_user)]
 )
 app.include_router(
     recommend_router,
     prefix='/fast_api',
     tags=["Recommend"],
-    dependencies=[Depends(jwt_handler.get_current_user)]
+    dependencies=[Depends(get_current_user)]
 )
 app.include_router(
     top_app,
     prefix='/fast_api',
     tags=["Top"],
-    dependencies=[Depends(jwt_handler.get_current_user)]
+    dependencies=[Depends(get_current_user)]
 )
 
 

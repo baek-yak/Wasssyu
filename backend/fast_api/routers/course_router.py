@@ -1,11 +1,13 @@
 from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from dependencies.dependencies import get_current_user
+import jwt
 import psycopg2
 import psycopg2.extras
 import os
 
+
 load_dotenv()
-# PostgreSQL DB 설정
 DB_CONFIG = {
     "user": os.environ.get("POSTGRES_USER"),
     "password": os.environ.get("POSTGRES_PASSWORD"),
@@ -32,13 +34,15 @@ def fetch_data(query, params=None):
 
 # 코스 목록 조회
 @course_router.get("/courses")
-def get_courses():
+def get_courses(current_user=Depends(get_current_user)):
     """모든 코스 목록을 반환"""
     query = """
         SELECT id, course_name, description, image_url
         FROM tour_course
     """
     data = fetch_data(query)
+    
+    print(f"{current_user} ----------------------")
 
     if not data:
         raise HTTPException(status_code=404, detail="No courses found")
