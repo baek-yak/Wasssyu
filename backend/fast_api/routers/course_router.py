@@ -218,8 +218,8 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
         # 응답 생성
         response = {
             "course": dict(course_data[0]),
-            "bakeries": bakeries,
-            "progress": progress_status
+            "course_datail": bakeries,
+            "completed_all": progress_status
         }
 
         return response
