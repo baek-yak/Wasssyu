@@ -162,7 +162,7 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
         if not course_data:
             raise HTTPException(status_code=404, detail=f"Course with ID {course_id} not found")
 
-        # 코스에 포함된 장소 정보 가져오기
+        # 코스에 포함된 장소 정보 가져오기 (Breadmon 이미지 포함)
         details_query = """
             SELECT DISTINCT ON (tse.spot_name)
                 tse.id AS spot_id,
@@ -173,12 +173,15 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
                 tse.business_hours, 
                 tse.elastic_id,
                 tse.spot_description AS description,
-                tsie.tourist_spot_image_url AS image_url
+                tsie.tourist_spot_image_url AS spot_image_url,
+                bme.mon_image_url AS breadmon_image_url
             FROM tour_course_details_entity AS tcde
             JOIN tourist_spot_entity AS tse
             ON tcde.bakery_id = tse.id
             LEFT JOIN tourist_spot_image_entity AS tsie
             ON tse.id = tsie.tourist_spot_entity_id
+            LEFT JOIN breadmon_entity AS bme
+            ON tse.id = bme.bakery_temp_id
             WHERE tcde.course_id = %s
             ORDER BY tse.spot_name, tsie.tourist_spot_image_url
         """
@@ -197,11 +200,11 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
         visited_spot_ids = {row["spot_id"] for row in visited_spots}
 
         # 관광지 정보에 방문 여부 추가
-        bakeries = []
+        course_details = []
         for row in details_data:
-            bakery = dict(row)
-            bakery["completed"] = bakery["spot_id"] in visited_spot_ids
-            bakeries.append(bakery)
+            detail = dict(row)
+            detail["completed"] = detail["spot_id"] in visited_spot_ids
+            course_details.append(detail)
 
         # 코스 상태 가져오기
         progress_query = """
@@ -218,7 +221,7 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
         # 응답 생성
         response = {
             "course": dict(course_data[0]),
-            "course_datail": bakeries,
+            "course_details": course_details,
             "completed_all": progress_status
         }
 
