@@ -146,7 +146,7 @@ def get_courses(current_user: str = Depends(get_current_user)):
 @course_router.get("/courses/{course_id}")
 def get_course_details(course_id: int, current_user: str = Depends(get_current_user)):
     """
-    특정 코스의 상세 정보를 반환하며, 사용자가 관광지를 방문했는지 여부와 코스의 진행 상태를 포함
+    특정 코스의 상세 정보를 반환하며, 사용자가 관광지를 방문했는지 여부와 진행 상태를 포함
     """
     try:
         user_id = get_user_id(current_user)  # `current_user`는 이메일
@@ -203,15 +203,23 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
             bakery["completed"] = bakery["spot_id"] in visited_spot_ids
             bakeries.append(bakery)
 
-        # 코스 완료 여부 확인
-        all_spot_ids = {row["spot_id"] for row in details_data}
-        is_completed = all_spot_ids == visited_spot_ids
+        # 코스 상태 가져오기
+        progress_query = """
+            SELECT progress
+            FROM user_course_progress
+            WHERE user_id = %s AND tour_course_id = %s
+        """
+        progress_data = fetch_data(progress_query, params=[user_id, course_id])
+        if not progress_data:
+            progress_status = "yet"  # 시작하지 않은 상태
+        else:
+            progress_status = progress_data[0]["progress"]
 
         # 응답 생성
         response = {
             "course": dict(course_data[0]),
             "bakeries": bakeries,
-            "completed_all": is_completed
+            "progress": progress_status
         }
 
         return response
