@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
 COPY backend/requirements.txt /app/backend/requirements.txt
 
 # Conda 환경 생성 및 패키지 설치
-RUN conda create -n fastapi_env python=3.10.11 -y && \
+RUN conda create -n fastapi_env python=3.9.20 -y && \
     conda run -n fastapi_env pip install --no-cache-dir -r /app/backend/requirements.txt && \
     conda clean -afy
 
