@@ -1,14 +1,12 @@
-from ast import expr_context
-from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException, Query
-from dependencies.dependencies import get_current_user
-from jwt_handler import logger
+from fastapi import APIRouter, HTTPException, Depends
 import psycopg2
 import psycopg2.extras
+from dependencies.dependencies import get_current_user  # JWT 인증 의존성
 import os
-
+from dotenv import load_dotenv
 
 load_dotenv()
+
 DB_CONFIG = {
     "user": os.environ.get("POSTGRES_USER"),
     "password": os.environ.get("POSTGRES_PASSWORD"),
@@ -44,35 +42,14 @@ def execute_query(query, params=None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
-
-# 코스 목록 조회
-@course_router.get("/courses")
-def get_courses():
-    try: 
-        """모든 코스 목록을 반환"""
-        query = """
-            SELECT id, course_name, description, image_url
-            FROM tour_course
-        """
-        data = fetch_data(query)
-
-        if not data:
-            raise HTTPException(status_code=404, detail="No courses found")
-
-        # 데이터를 Dict 형태로 변환
-        courses = [dict(row) for row in data]
-        return courses
-    
-    except Exception as e:
-        print(f"ERROR: {e}")
-        logger.error(f"Error in Get course: {e}")
-
 # 장소 방문 처리
 @course_router.post("/courses/{course_id}/spots/{spot_id}/visit")
-def visit_spot(course_id: int, spot_id: int, user_id: int = Query(..., description="사용자 ID")):
+def visit_spot(course_id: int, spot_id: int, current_user: dict = Depends(get_current_user)):
     """
     특정 장소를 방문 처리하고, 코스의 모든 장소가 완료되었는지 반환
     """
+    user_id = current_user["id"]  # JWT에서 추출된 사용자 ID
+
     # 장소 방문 기록 추가
     visit_query = """
         INSERT INTO user_visit_records (user_id, spot_id)
@@ -114,10 +91,12 @@ def visit_spot(course_id: int, spot_id: int, user_id: int = Query(..., descripti
 
 # 코스 상세 조회
 @course_router.get("/courses/{course_id}")
-def get_course_details(course_id: int, user_id: int = Query(..., description="사용자 ID")):
+def get_course_details(course_id: int, current_user: dict = Depends(get_current_user)):
     """
     특정 코스의 상세 정보를 반환하며 사용자가 관광지를 방문했는지 여부를 포함
     """
+    user_id = current_user["id"]  # JWT에서 추출된 사용자 ID
+
     # 코스 정보 가져오기
     course_query = """
         SELECT id, course_name, description, image_url
@@ -180,3 +159,5 @@ def get_course_details(course_id: int, user_id: int = Query(..., description="�
         "bakeries": bakeries,
         "completed": is_completed
     }
+
+    return response
