@@ -381,3 +381,47 @@ def get_user_challenges(current_user: str = Depends(get_current_user)):
         print(f"ERROR: {e}")
         logger.error(f"Error in Get user challenges: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+    
+    
+@course_router.get("/user/breadmons")
+def get_collected_breadmons(current_user: str = Depends(get_current_user)):
+    """
+    사용자가 채집한 브레드몬 리스트를 반환
+    """
+    try:
+        user_id = get_user_id(current_user)  # `current_user`는 이메일
+
+        # 사용자 채집한 브레드몬 조회
+        collected_breadmons_query = """
+            SELECT 
+                bme.bakery_temp_id AS spot_id,
+                bme.mon_image_url AS breadmon_image,
+                tse.spot_name AS bakery_name
+            FROM user_visit_records AS uvr
+            JOIN breadmon_entity AS bme
+            ON uvr.spot_id = bme.bakery_temp_id
+            JOIN tourist_spot_entity AS tse
+            ON bme.bakery_temp_id = tse.id
+            WHERE uvr.user_id = %s
+        """
+        collected_breadmons = fetch_data(collected_breadmons_query, params=[user_id])
+
+        if not collected_breadmons:
+            return {"message": "No breadmons collected"}
+
+        # 브레드몬 리스트 생성
+        breadmons = [
+            {
+                "spot_id": row["spot_id"],
+                "wassumon_image": row["breadmon_image"],
+                "spot_name": row["bakery_name"]
+            }
+            for row in collected_breadmons
+        ]
+
+        return {"collected_breadmons": breadmons}
+
+    except Exception as e:
+        print(f"ERROR: {e}")
+        logger.error(f"Error in Get collected breadmons: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
