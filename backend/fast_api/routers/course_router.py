@@ -286,3 +286,98 @@ def visit_spot(course_id: int, spot_id: int, current_user: str = Depends(get_cur
         "visited_spots": len(visited_spot_ids),
         "remaining_spots": len(all_spot_ids - visited_spot_ids)
     }
+    
+    
+# 사용자 챌린지 상태 조회 (진행 중 + 완료된 코스)
+@course_router.get("/user/challenges")
+def get_user_challenges(current_user: str = Depends(get_current_user)):
+    """
+    진행 중인 챌린지와 완료된 챌린지를 조회
+    """
+    try:
+        user_id = get_user_id(current_user)  # `current_user`는 이메일
+
+        # 진행 중 및 완료된 코스 정보 가져오기
+        challenges_query = """
+            SELECT tc.id AS course_id, tc.course_name, tc.description, tc.image_url, ucp.progress
+            FROM user_course_progress AS ucp
+            JOIN tour_course AS tc
+            ON ucp.tour_course_id = tc.id
+            WHERE ucp.user_id = %s
+        """
+        challenges_data = fetch_data(challenges_query, params=[user_id])
+
+        if not challenges_data:
+            return {"message": "No challenges found"}
+
+        # 진행 중 및 완료된 코스 구분
+        in_progress_courses = []
+        completed_courses = []
+
+        for course in challenges_data:
+            course_id = course["course_id"]
+
+            # 해당 코스의 장소 정보 가져오기
+            details_query = """
+                SELECT DISTINCT ON (tse.spot_name)
+                    tse.id AS spot_id,
+                    tse.spot_name AS bakery_name, 
+                    tse.spot_address AS address, 
+                    tse.rating, 
+                    tse.phone, 
+                    tse.business_hours, 
+                    tse.elastic_id,
+                    tse.spot_description AS description,
+                    tsie.tourist_spot_image_url AS image_url
+                FROM tour_course_details_entity AS tcde
+                JOIN tourist_spot_entity AS tse
+                ON tcde.bakery_id = tse.id
+                LEFT JOIN tourist_spot_image_entity AS tsie
+                ON tse.id = tsie.tourist_spot_entity_id
+                WHERE tcde.course_id = %s
+                ORDER BY tse.spot_name, tsie.tourist_spot_image_url
+            """
+            details_data = fetch_data(details_query, params=[course_id])
+
+            # 사용자 방문 기록 가져오기
+            visits_query = """
+                SELECT spot_id
+                FROM user_visit_records
+                WHERE user_id = %s
+            """
+            visited_spots = fetch_data(visits_query, params=[user_id])
+            visited_spot_ids = {row["spot_id"] for row in visited_spots}
+
+            # 장소별 방문 여부 추가
+            course_details = []
+            for row in details_data:
+                detail = dict(row)
+                detail["completed"] = detail["spot_id"] in visited_spot_ids
+                course_details.append(detail)
+
+            # 코스 데이터 구성
+            course_data = {
+                "course": {
+                    "id": course["course_id"],
+                    "course_name": course["course_name"],
+                    "description": course["description"],
+                    "image_url": course["image_url"]
+                },
+                "course_details": course_details
+            }
+
+            # 진행 중 또는 완료된 상태에 따라 분류
+            if course["progress"] == "start":
+                in_progress_courses.append(course_data)
+            elif course["progress"] == "complete":
+                completed_courses.append(course_data)
+
+        return {
+            "in_progress": in_progress_courses,
+            "completed": completed_courses
+        }
+
+    except Exception as e:
+        print(f"ERROR: {e}")
+        logger.error(f"Error in Get user challenges: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
