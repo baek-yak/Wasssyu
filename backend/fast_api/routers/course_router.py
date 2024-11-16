@@ -43,8 +43,6 @@ def get_courses():
             FROM tour_course
         """
         data = fetch_data(query)
-        
-        print(f"{current_user} ----------------------")
 
         if not data:
             raise HTTPException(status_code=404, detail="No courses found")
