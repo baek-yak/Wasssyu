@@ -60,25 +60,67 @@ def get_user_id(email: str):
 
 # 코스 목록 조회
 @course_router.get("/courses")
-def get_courses():
-    try: 
-        """모든 코스 목록을 반환"""
+def get_courses(current_user: str = Depends(get_current_user)):
+    """
+    모든 코스 목록을 반환하며, 각 코스의 완료 상태를 포함
+    """
+    try:
+        # 이메일을 기반으로 사용자 ID 가져오기
+        user_id = get_user_id(current_user)
+
+        # 모든 코스 정보 가져오기
         query = """
             SELECT id, course_name, description, image_url
             FROM tour_course
         """
-        data = fetch_data(query)
+        courses_data = fetch_data(query)
 
-        if not data:
+        if not courses_data:
             raise HTTPException(status_code=404, detail="No courses found")
 
-        # 데이터를 Dict 형태로 변환
-        courses = [dict(row) for row in data]
-        return courses
-    
+        # 모든 코스의 완료 상태 계산
+        completed_courses = []
+        for course in courses_data:
+            course_id = course["id"]
+
+            # 코스 내 모든 장소 ID 가져오기
+            spots_query = """
+                SELECT tse.id AS spot_id
+                FROM tour_course_details_entity AS tcde
+                JOIN tourist_spot_entity AS tse
+                ON tcde.bakery_id = tse.id
+                WHERE tcde.course_id = %s
+            """
+            all_spots = fetch_data(spots_query, params=[course_id])
+            all_spot_ids = {row["spot_id"] for row in all_spots}
+
+            # 사용자가 방문한 장소 ID 가져오기
+            visits_query = """
+                SELECT spot_id
+                FROM user_visit_records
+                WHERE user_id = %s AND spot_id = ANY(%s)
+            """
+            visited_spots = fetch_data(visits_query, params=[user_id, list(all_spot_ids)])
+            visited_spot_ids = {row["spot_id"] for row in visited_spots}
+
+            # 코스 완료 여부 확인
+            is_completed = all_spot_ids == visited_spot_ids
+
+            # 코스 정보에 completed 상태 추가
+            completed_courses.append({
+                "id": course["id"],
+                "course_name": course["course_name"],
+                "description": course["description"],
+                "image_url": course["image_url"],
+                "completed_all": is_completed
+            })
+
+        return completed_courses
+
     except Exception as e:
         print(f"ERROR: {e}")
-        logger.error(f"Error in Get course: {e}")
+        logger.error(f"Error in Get courses: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # 장소 방문 처리
@@ -196,7 +238,7 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
     response = {
         "course": dict(course_data[0]),
         "bakeries": bakeries,
-        "completed": is_completed
+        "completed_all": is_completed
     }
 
     return response
