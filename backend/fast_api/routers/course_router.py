@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 import psycopg2
 import psycopg2.extras
+from jwt_handler import logger
 from dependencies.dependencies import get_current_user  # JWT 인증 의존성
 import os
 from dotenv import load_dotenv
@@ -56,6 +57,29 @@ def get_user_id(email: str):
         raise HTTPException(status_code=404, detail="User not found")
     
     return result[0]["id"]
+
+# 코스 목록 조회
+@course_router.get("/courses")
+def get_courses():
+    try: 
+        """모든 코스 목록을 반환"""
+        query = """
+            SELECT id, course_name, description, image_url
+            FROM tour_course
+        """
+        data = fetch_data(query)
+
+        if not data:
+            raise HTTPException(status_code=404, detail="No courses found")
+
+        # 데이터를 Dict 형태로 변환
+        courses = [dict(row) for row in data]
+        return courses
+    
+    except Exception as e:
+        print(f"ERROR: {e}")
+        logger.error(f"Error in Get course: {e}")
+
 
 # 장소 방문 처리
 @course_router.post("/courses/{course_id}/spots/{spot_id}/visit")
