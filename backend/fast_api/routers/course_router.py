@@ -146,7 +146,7 @@ def get_courses(current_user: str = Depends(get_current_user)):
 @course_router.get("/courses/{course_id}")
 def get_course_details(course_id: int, current_user: str = Depends(get_current_user)):
     """
-    특정 코스의 상세 정보를 반환하며, 사용자가 관광지를 방문했는지 여부와 진행 상태를 포함
+    특정 코스의 상세 정보를 반환하며, 사용자가 관광지를 방문했는지 여부, 진행 상태, 그리고 해시태그를 포함
     """
     try:
         user_id = get_user_id(current_user)  # `current_user`는 이메일
@@ -199,11 +199,21 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
         visited_spots = fetch_data(visits_query, params=[user_id])
         visited_spot_ids = {row["spot_id"] for row in visited_spots}
 
-        # 관광지 정보에 방문 여부 추가
+        # 관광지 정보에 방문 여부와 해시태그 추가
         course_details = []
         for row in details_data:
             detail = dict(row)
             detail["completed"] = detail["spot_id"] in visited_spot_ids
+
+            # 해시태그 가져오기
+            hashtags_query = """
+                SELECT hashtag
+                FROM spot_hashtag
+                WHERE spot_id = %s
+            """
+            hashtags_data = fetch_data(hashtags_query, params=[detail["spot_id"]])
+            detail["hashtags"] = [tag["hashtag"] for tag in hashtags_data]
+
             course_details.append(detail)
 
         # 코스 상태 가져오기
@@ -386,45 +396,80 @@ def get_user_challenges(current_user: str = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Internal server error")
     
     
-@course_router.get("/user/breadmons")
+@course_router.get("/user/wassumon")
 def get_collected_breadmons(current_user: str = Depends(get_current_user)):
     """
-    사용자가 채집한 브레드몬 리스트를 반환
+    사용자가 채집한 와쑤몬 목록을 반환 (이미지 URL과 이름만)
     """
     try:
         user_id = get_user_id(current_user)  # `current_user`는 이메일
 
-        # 사용자 채집한 브레드몬 조회
-        collected_breadmons_query = """
+        # 사용자 채집한 와쑤몬 조회 (이미지와 이름만 반환)
+        collected_wassumon_query = """
             SELECT 
-                bme.bakery_temp_id AS spot_id,
-                bme.mon_image_url AS breadmon_image,
-                tse.spot_name AS bakery_name
+                wme.spot_id AS spot_id,
+                wme.name AS wassumon_name,
+                wme.image AS wassumon_image
             FROM user_visit_records AS uvr
-            JOIN breadmon_entity AS bme
-            ON uvr.spot_id = bme.bakery_temp_id
-            JOIN tourist_spot_entity AS tse
-            ON bme.bakery_temp_id = tse.id
+            JOIN wassu_mon_entity AS wme
+            ON uvr.spot_id = wme.spot_id
             WHERE uvr.user_id = %s
         """
-        collected_breadmons = fetch_data(collected_breadmons_query, params=[user_id])
+        collected_wassumon = fetch_data(collected_wassumon_query, params=[user_id])
 
-        if not collected_breadmons:
-            return {"message": "No breadmons collected"}
+        if not collected_wassumon:
+            return {"message": "No wassumons collected"}
 
-        # 브레드몬 리스트 생성
-        breadmons = [
+        # 와쑤몬 리스트 생성
+        wassumons = [
             {
                 "spot_id": row["spot_id"],
-                "wassumon_image": row["breadmon_image"],
-                "spot_name": row["bakery_name"]
+                "wassumon_name": row["wassumon_name"],
+                "wassumon_image": row["wassumon_image"]
             }
-            for row in collected_breadmons
+            for row in collected_wassumon
         ]
 
-        return {"collected_breadmons": breadmons}
+        return {"collected_wassumons": wassumons}
 
     except Exception as e:
         print(f"ERROR: {e}")
-        logger.error(f"Error in Get collected breadmons: {e}")
+        logger.error(f"Error in Get collected wassumons: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@course_router.get("/wassumons/{spot_id}")
+def get_wassumon_details(spot_id: int, current_user: str = Depends(get_current_user)):
+    """
+    특정 와쑤몬의 상세 정보를 반환
+    """
+    try:
+        # 특정 와쑤몬 상세 정보 조회
+        wassumon_detail_query = """
+            SELECT 
+                wme.spot_id AS spot_id,
+                wme.name AS wassumon_name,
+                wme.image AS wassumon_image,
+                wme.type AS wassumon_type,
+                wme.weight AS wassumon_weight,
+                wme.height AS wassumon_height,
+                wme.description AS wassumon_description,
+                tse.spot_name AS spot_name
+            FROM wassu_mon_entity AS wme
+            JOIN tourist_spot_entity AS tse
+            ON wme.spot_id = tse.id
+            WHERE wme.spot_id = %s
+        """
+        wassumon_data = fetch_data(wassumon_detail_query, params=[spot_id])
+
+        if not wassumon_data:
+            raise HTTPException(status_code=404, detail=f"Wassumon with spot_id {spot_id} not found")
+
+        # 상세 정보 반환
+        wassumon = dict(wassumon_data[0])
+        return {"wassumon_details": wassumon}
+
+    except Exception as e:
+        print(f"ERROR: {e}")
+        logger.error(f"Error in Get wassumon details: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
