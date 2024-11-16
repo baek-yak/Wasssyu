@@ -161,6 +161,16 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
 
         if not course_data:
             raise HTTPException(status_code=404, detail=f"Course with ID {course_id} not found")
+        
+        # 코스 해시태그 가져오기
+        course_hashtag_query = """
+            SELECT hashtag
+            FROM course_hashtag
+            WHERE course_id = %s
+        """
+        course_hashtags_data = fetch_data(course_hashtag_query, params=[course_id])
+        course_hashtags = [row["hashtag"] for row in course_hashtags_data]
+
 
         # 코스에 포함된 장소 정보 가져오기 (Breadmon 이미지 포함)
         details_query = """
@@ -177,7 +187,7 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
                 wme.image AS wassumon_image_url,
                 wme.name AS wassumon_name
             FROM tour_course_details_entity AS tcde
-            JOIN tourist_spot_entity AS tse
+            JOIN tourist_spot_entity AS tseㄴ
             ON tcde.bakery_id = tse.id
             LEFT JOIN tourist_spot_image_entity AS tsie
             ON tse.id = tsie.tourist_spot_entity_id
@@ -231,7 +241,10 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
 
         # 응답 생성
         response = {
-            "course": dict(course_data[0]),
+            "course": {
+                **dict(course_data[0]),
+                "hashtags" : course_hashtags
+                },
             "course_details": course_details,
             "completed_all": progress_status
         }
