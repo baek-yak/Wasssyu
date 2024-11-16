@@ -42,13 +42,28 @@ def execute_query(query, params=None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
+def get_user_id(email: str):
+    """
+    이메일을 기반으로 사용자 ID를 가져옵니다.
+    """
+    query = """
+        SELECT id
+        FROM user_entity
+        WHERE email = %s
+    """
+    result = fetch_data(query, params=[email])
+    if not result:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return result[0]["id"]
+
 # 장소 방문 처리
 @course_router.post("/courses/{course_id}/spots/{spot_id}/visit")
-def visit_spot(course_id: int, spot_id: int, current_user: dict = Depends(get_current_user)):
+def visit_spot(course_id: int, spot_id: int, current_user: str = Depends(get_current_user)):
     """
     특정 장소를 방문 처리하고, 코스의 모든 장소가 완료되었는지 반환
     """
-    user_id = current_user["id"]  # JWT에서 추출된 사용자 ID
+    user_id = get_user_id(current_user)  # `current_user`는 이메일
 
     # 장소 방문 기록 추가
     visit_query = """
@@ -91,11 +106,11 @@ def visit_spot(course_id: int, spot_id: int, current_user: dict = Depends(get_cu
 
 # 코스 상세 조회
 @course_router.get("/courses/{course_id}")
-def get_course_details(course_id: int, current_user: dict = Depends(get_current_user)):
+def get_course_details(course_id: int, current_user: str = Depends(get_current_user)):
     """
     특정 코스의 상세 정보를 반환하며 사용자가 관광지를 방문했는지 여부를 포함
     """
-    user_id = current_user["id"]  # JWT에서 추출된 사용자 ID
+    user_id = get_user_id(current_user)  # `current_user`는 이메일
 
     # 코스 정보 가져오기
     course_query = """
