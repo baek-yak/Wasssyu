@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
 COPY backend/requirements.txt /app/backend/requirements.txt
 
 # Conda 환경 생성 및 패키지 설치
-RUN conda create -n fastapi_env python=3.9.20 -y && \
+RUN conda create -n fastapi_env python=3.10.11 -y && \
     conda run -n fastapi_env pip install --no-cache-dir -r /app/backend/requirements.txt && \
     conda clean -afy
 
@@ -31,4 +31,4 @@ COPY backend/ /app/backend
 COPY config.py /app/config.py
 
 # FastAPI 애플리케이션 실행 명령어
-CMD ["conda", "run", "-n", "fastapi_env", "uvicorn", "backend.fast_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
+CMD ["conda", "run", "--no-capture-output", "-n", "fastapi_env", "uvicorn", "backend.fast_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,6 +9,7 @@ from routers.chat_router import chat_router
 from routers.course_router import course_router
 from routers.recommend_spot_router import recommend_router
 from routers.count_top_router import top_app
+from dependencies.dependencies import get_current_user
 
 # 로깅 설정
 logging.basicConfig(
@@ -19,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 # 환경 변수 로드
 load_dotenv()
+
+# JWT 핸들러 인스턴스 생성
+# jwt_handler = JWTHandler()
 
 # FastAPI 애플리케이션 설정
 app = FastAPI(
@@ -41,28 +45,35 @@ app.add_middleware(
 app.include_router(
     bakeryrouter,
     prefix='/fast_api',
-    tags=["Bakery"]
+    tags=["Bakery"],
+    dependencies=[Depends(get_current_user)]
 )
 app.include_router(
     chat_router,
     prefix='/fast_api',
-    tags=["Chat"]
+    tags=["Chat"],
+    dependencies=[Depends(get_current_user)]
 )
 app.include_router(
     course_router,
     prefix='/fast_api',
-    tags=["Course"]
+    tags=["Course"],
+    dependencies=[Depends(get_current_user)]
 )
 app.include_router(
     recommend_router,
     prefix='/fast_api',
-    tags=["Recommend"]
+    tags=["Recommend"],
+    dependencies=[Depends(get_current_user)]
 )
 app.include_router(
     top_app,
     prefix='/fast_api',
-    tags=["Top"]
+    tags=["Top"],
+    dependencies=[Depends(get_current_user)]
 )
+
+
 
 @app.get("/", tags=["Root"])
 def read_root():
