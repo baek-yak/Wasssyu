@@ -174,15 +174,15 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
                 tse.elastic_id,
                 tse.spot_description AS description,
                 tsie.tourist_spot_image_url AS spot_image_url,
-                wme.image AS breadmon_image_url,
-                wme.name AS bread_mon_name
+                wme.image AS wassumon_image_url,
+                wme.name AS wassumon_name
             FROM tour_course_details_entity AS tcde
             JOIN tourist_spot_entity AS tse
             ON tcde.bakery_id = tse.id
             LEFT JOIN tourist_spot_image_entity AS tsie
             ON tse.id = tsie.tourist_spot_entity_id
             LEFT JOIN wassu_mon_entity AS wme
-            ON tse.id = bme.bakery_temp_id
+            ON tse.id = wme.spot_id
             WHERE tcde.course_id = %s
             ORDER BY tse.spot_name, tsie.tourist_spot_image_url
         """
