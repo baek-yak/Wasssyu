@@ -142,6 +142,85 @@ def get_courses(current_user: str = Depends(get_current_user)):
         logger.error(f"Error in Get courses: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+# 코스 상세 조회
+@course_router.get("/courses/{course_id}")
+def get_course_details(course_id: int, current_user: str = Depends(get_current_user)):
+    """
+    특정 코스의 상세 정보를 반환하며, 사용자가 관광지를 방문했는지 여부와 코스의 진행 상태를 포함
+    """
+    try:
+        user_id = get_user_id(current_user)  # `current_user`는 이메일
+
+        # 코스 정보 가져오기
+        course_query = """
+            SELECT id, course_name, description, image_url
+            FROM tour_course
+            WHERE id = %s
+        """
+        course_data = fetch_data(course_query, params=[course_id])
+
+        if not course_data:
+            raise HTTPException(status_code=404, detail=f"Course with ID {course_id} not found")
+
+        # 코스에 포함된 장소 정보 가져오기
+        details_query = """
+            SELECT DISTINCT ON (tse.spot_name)
+                tse.id AS spot_id,
+                tse.spot_name AS bakery_name, 
+                tse.spot_address AS address, 
+                tse.rating, 
+                tse.phone, 
+                tse.business_hours, 
+                tse.elastic_id,
+                tse.spot_description AS description,
+                tsie.tourist_spot_image_url AS image_url
+            FROM tour_course_details_entity AS tcde
+            JOIN tourist_spot_entity AS tse
+            ON tcde.bakery_id = tse.id
+            LEFT JOIN tourist_spot_image_entity AS tsie
+            ON tse.id = tsie.tourist_spot_entity_id
+            WHERE tcde.course_id = %s
+            ORDER BY tse.spot_name, tsie.tourist_spot_image_url
+        """
+        details_data = fetch_data(details_query, params=[course_id])
+
+        if not details_data:
+            raise HTTPException(status_code=404, detail=f"No spots found for course ID {course_id}")
+
+        # 사용자 방문 기록 가져오기
+        visits_query = """
+            SELECT spot_id
+            FROM user_visit_records
+            WHERE user_id = %s
+        """
+        visited_spots = fetch_data(visits_query, params=[user_id])
+        visited_spot_ids = {row["spot_id"] for row in visited_spots}
+
+        # 관광지 정보에 방문 여부 추가
+        bakeries = []
+        for row in details_data:
+            bakery = dict(row)
+            bakery["completed"] = bakery["spot_id"] in visited_spot_ids
+            bakeries.append(bakery)
+
+        # 코스 완료 여부 확인
+        all_spot_ids = {row["spot_id"] for row in details_data}
+        is_completed = all_spot_ids == visited_spot_ids
+
+        # 응답 생성
+        response = {
+            "course": dict(course_data[0]),
+            "bakeries": bakeries,
+            "completed_all": is_completed
+        }
+
+        return response
+
+    except Exception as e:
+        print(f"ERROR: {e}")
+        logger.error(f"Error in Get course details: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 # 장소 방문 처리
 @course_router.post("/courses/{course_id}/spots/{spot_id}/visit")
 def visit_spot(course_id: int, spot_id: int, current_user: str = Depends(get_current_user)):
