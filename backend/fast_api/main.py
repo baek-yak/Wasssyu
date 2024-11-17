@@ -10,6 +10,7 @@ from routers.course_router import course_router
 from routers.recommend_spot_router import recommend_router
 from routers.count_top_router import top_app
 from dependencies.dependencies import get_current_user
+from routers.marble_router import marble_router
 
 # 로깅 설정
 logging.basicConfig(
@@ -72,7 +73,12 @@ app.include_router(
     tags=["Top"],
     dependencies=[Depends(get_current_user)]
 )
-
+app.include_router(
+    marble_router,
+    prefix='/fast_api',
+    tags=["Top"],
+    dependencies=[Depends(get_current_user)]
+)
 
 
 @app.get("/", tags=["Root"])
