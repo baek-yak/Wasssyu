@@ -186,6 +186,7 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
                 tsie.tourist_spot_image_url AS spot_image_url,
                 wme.image AS wassumon_image_url,
                 wme.name AS wassumon_name
+                wme.model AS wassumon_model
             FROM tour_course_details_entity AS tcde
             JOIN tourist_spot_entity AS tse
             ON tcde.bakery_id = tse.id
