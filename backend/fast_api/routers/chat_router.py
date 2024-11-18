@@ -74,7 +74,7 @@ def generate_user_embedding(user_input):
     try:
         response = client.embeddings.create(
             input=user_input,
-            model="text-embedding-ada-002"
+            model="text-embedding-3-large"
         )
         return np.array(response.data[0].embedding)
     except Exception as e:
