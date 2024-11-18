@@ -24,7 +24,7 @@ def fetch_food_related_spots():
         FROM tourist_spot_entity AS tse
         JOIN tourist_spot_tag_entity AS tste
         ON tse.id = tste.tourist_spot_entity_id
-        WHERE tste.tag = '음식';
+        WHERE tste.tag = '빵집';
     """
 
     try:
