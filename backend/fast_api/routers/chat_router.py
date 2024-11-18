@@ -50,18 +50,24 @@ def load_all_data():
         data = pd.read_sql_query(query, connection)
         connection.close()
 
-        # `embedding` 컬럼이 vector 타입으로 저장된 경우 변환
-        data['embedding'] = data['embedding'].apply(
-            lambda x: np.array(x, dtype=np.float32) if x is not None else None
-        )
+        # `embedding` 컬럼 처리: 문자열을 배열로 변환
+        def parse_embedding(embedding):
+            if isinstance(embedding, str):
+                try:
+                    return np.array(json.loads(embedding), dtype=np.float32)
+                except Exception as e:
+                    print(f"Error parsing embedding: {e}")
+                    return None
+            return embedding  # 이미 numpy 배열일 경우
 
-        # 누락된 `embedding` 제거
+        data['embedding'] = data['embedding'].apply(parse_embedding)
+
+        # `embedding`이 None인 행 제거
         data = data.dropna(subset=["embedding"])
         return data
     except Exception as e:
         print(f"Error loading data: {e}")
         return pd.DataFrame()
-
 # 사용자 입력 임베딩 생성
 def generate_user_embedding(user_input):
     """사용자 입력을 임베딩으로 변환"""
