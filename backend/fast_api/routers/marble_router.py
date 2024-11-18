@@ -79,6 +79,18 @@ def parse_embedding(embedding_data):
         print(f"Unexpected embedding format: {embedding_data}")
         return None
 
+# 좌표 기반 가장 가까운 장소 검색
+def find_closest_spot(lat, lon, df):
+    try:
+        df['distance'] = df.apply(
+            lambda row: geodesic((lat, lon), (row['latitude'], row['longitude'])).km, axis=1
+        )
+        closest_spot = df.loc[df['distance'].idxmin()]
+        return {"spot_id": int(closest_spot["id"]), "spot_name": closest_spot["spot_name"]}
+    except Exception as e:
+        print(f"Error finding closest spot: {e}")
+        raise HTTPException(status_code=500, detail="Failed to find closest spot")
+
 # 강화학습 환경 정의
 class TouristBoardEnv:
     def __init__(self, places, user_embedding, start_coords, end_coords):
@@ -132,9 +144,8 @@ def explore_and_find_optimal(env, num_episodes=50):
         if total_reward > best_reward:
             best_reward = total_reward
             best_route = visited_places
-    return list(dict.fromkeys(best_route))[:28]  # 중복 제거 및 28개로 제한
+    return list(dict.fromkeys(best_route))[:26]  # 중복 제거 및 26개로 제한
 
-# 최적 경로 API 엔드포인트
 # 최적 경로 API 엔드포인트
 @marble_router.post("/api/optimal-route")
 def get_optimal_route(user_input: UserInput):
@@ -152,6 +163,10 @@ def get_optimal_route(user_input: UserInput):
     if user_embedding is None:
         raise HTTPException(status_code=500, detail="Failed to generate user embedding")
 
+    # 출발지와 도착지 정보 찾기
+    start_spot = find_closest_spot(user_input.start_lat, user_input.start_lon, df)
+    end_spot = find_closest_spot(user_input.end_lat, user_input.end_lon, df)
+
     # 강화학습 환경 생성
     start_coords = (user_input.start_lat, user_input.start_lon)
     end_coords = (user_input.end_lat, user_input.end_lon)
@@ -160,12 +175,17 @@ def get_optimal_route(user_input: UserInput):
     # 탐험 및 최적 경로 탐색
     optimal_route = explore_and_find_optimal(env, num_episodes=50)
 
-    # 최적 경로의 장소 이름 및 ID 반환
+    # 최적 경로에 출발지와 도착지 추가
     optimal_places = [
-        {
-            "spot_id": int(df.iloc[idx]["id"]),
-            "spot_name": df.iloc[idx]["spot_name"]
-        }
-        for idx in optimal_route
+        start_spot,
+        *[
+            {
+                "spot_id": int(df.iloc[idx]["id"]),
+                "spot_name": df.iloc[idx]["spot_name"]
+            }
+            for idx in optimal_route
+        ],
+        end_spot
     ]
+
     return {"optimal_route": optimal_places}
