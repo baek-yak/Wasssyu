@@ -216,9 +216,13 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
 
         # 관광지 정보에 방문 여부와 해시태그 추가
         course_details = []
+        complited_count = 0
         for row in details_data:
             detail = dict(row)
             detail["completed"] = detail["spot_id"] in visited_spot_ids
+            
+            if detail["completed"]:
+                complited_count += 1
 
             # 해시태그 가져오기
             hashtags_query = """
@@ -250,7 +254,8 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
                 "hashtags" : course_hashtags
                 },
             "course_details": course_details,
-            "completed_all": progress_status
+            "completed_all": progress_status,
+            "completed_count": complited_count
         }
 
         return response
