@@ -33,6 +33,9 @@ def load_all_data():
         spot_address AS address,
         spot_description AS description,
         phone,
+        business_hours,
+        favorites_count,
+        rating,
         embedding
     FROM tourist_spot_entity;
     """
@@ -47,10 +50,13 @@ def load_all_data():
         data = pd.read_sql_query(query, connection)
         connection.close()
 
-        # `embedding`이 JSON 문자열로 저장된 경우 변환
+        # `embedding` 컬럼이 vector 타입으로 저장된 경우 변환
         data['embedding'] = data['embedding'].apply(
-            lambda x: np.array(json.loads(x), dtype=np.float32) if isinstance(x, str) else x
+            lambda x: np.array(x, dtype=np.float32) if x is not None else None
         )
+
+        # 누락된 `embedding` 제거
+        data = data.dropna(subset=["embedding"])
         return data
     except Exception as e:
         print(f"Error loading data: {e}")
@@ -62,7 +68,7 @@ def generate_user_embedding(user_input):
     try:
         response = client.embeddings.create(
             input=user_input,
-            model="text-embedding-3-large"
+            model="text-embedding-ada-002"
         )
         return np.array(response.data[0].embedding)
     except Exception as e:
@@ -76,6 +82,7 @@ def handle_course_recommendation(user_input, data, filters=None):
     if user_embedding is None:
         return "사용자 입력 임베딩 생성에 실패했습니다."
 
+    # 코사인 유사도 계산
     embeddings = np.stack(data['embedding'].to_numpy())
     similarities = cosine_similarity([user_embedding], embeddings)[0]
     data['similarity'] = similarities
@@ -86,48 +93,9 @@ def handle_course_recommendation(user_input, data, filters=None):
         if 'min_favorites' in filters:
             data = data[data['favorites_count'] >= filters['min_favorites']]
 
+    # 유사도 기준으로 정렬 후 상위 5개 선택
     recommended = data.sort_values(by='similarity', ascending=False).head(5)
-    return recommended[['name', 'address', 'rating', 'favorites_count', 'phone']]
-
-# 정보 요청 처리
-def handle_info_request(user_input, data):
-    """정보 요청 처리"""
-    for idx, row in data.iterrows():
-        if row['name'] in user_input:
-            if "주소" in user_input:
-                return f"{row['name']}의 주소는 {row['address']}입니다."
-            elif "평점" in user_input:
-                return f"{row['name']}의 평점은 {row['rating']}입니다."
-            elif "즐겨찾기" in user_input:
-                return f"{row['name']}의 즐겨찾기 수는 {row['favorites_count']}개입니다."
-            elif "전화" in user_input:
-                return f"{row['name']}의 전화번호는 {row['phone']}입니다."
-            
-    return "해당 정보를 찾을 수 없습니다."
-
-# 자연스러운 응답 생성
-def generate_natural_response(user_input, result):
-    """OpenAI GPT를 사용해 자연스러운 응답 생성"""
-    prompt = f"""
-    사용자의 질문: {user_input}
-    결과: {result}
-
-    위 결과를 기반으로 사용자에게 친근하고 자연스러운 대화체로 답변을 작성하세요.
-    """
-    try:
-        completion = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "당신은 여행 정보와 추천을 제공하는 전문 챗봇입니다."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=3000,
-            temperature=0.7
-        )
-        return completion.choices[0].message.content
-    except Exception as e:
-        print(f"OpenAI API 호출 중 오류가 발생했습니다: {e}")
-        return "죄송합니다. 요청을 처리하는 중 문제가 발생했습니다."
+    return recommended[['name', 'address', 'rating', 'favorites_count', 'phone', 'business_hours']]
 
 # 사용자 입력 처리
 def process_user_input(user_input, data):
@@ -152,7 +120,23 @@ def process_user_input(user_input, data):
     else:
         response = "입력을 이해하지 못했습니다. 다시 시도해주세요."
 
-    return generate_natural_response(user_input, response)
+    return response
+
+# 정보 요청 처리
+def handle_info_request(user_input, data):
+    """정보 요청 처리"""
+    for idx, row in data.iterrows():
+        if row['name'] in user_input:
+            if "주소" in user_input:
+                return f"{row['name']}의 주소는 {row['address']}입니다."
+            elif "평점" in user_input:
+                return f"{row['name']}의 평점은 {row['rating']}입니다."
+            elif "즐겨찾기" in user_input:
+                return f"{row['name']}의 즐겨찾기 수는 {row['favorites_count']}개입니다."
+            elif "전화" in user_input:
+                return f"{row['name']}의 전화번호는 {row['phone']}입니다."
+            
+    return "해당 정보를 찾을 수 없습니다."
 
 # 사용자 입력 분류
 def classify_input(user_input):
