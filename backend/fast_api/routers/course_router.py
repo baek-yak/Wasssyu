@@ -384,11 +384,17 @@ def get_user_challenges(current_user: str = Depends(get_current_user)):
             visited_spots = fetch_data(visits_query, params=[user_id])
             visited_spot_ids = {row["spot_id"] for row in visited_spots}
 
-            # 장소별 방문 여부 추가
+            # 장소별 방문 여부 추가 및 완료된 장소 수 카운트
             course_details = []
+            completed_count = 0
             for row in details_data:
                 detail = dict(row)
                 detail["completed"] = detail["spot_id"] in visited_spot_ids
+
+                # 완료된 장소 카운트
+                if detail["completed"]:
+                    completed_count += 1
+
                 course_details.append(detail)
 
             # 코스 데이터 구성
@@ -397,9 +403,11 @@ def get_user_challenges(current_user: str = Depends(get_current_user)):
                     "id": course["course_id"],
                     "course_name": course["course_name"],
                     "description": course["description"],
-                    "image_url": course["image_url"]
+                    "image_url": course["image_url"],
                 },
-                "course_details": course_details
+                "course_details": course_details,
+                "completed_count": completed_count,  # 완료된 장소 수
+                "total_spots": len(details_data),  # 총 장소 수
             }
 
             # 진행 중 또는 완료된 상태에 따라 분류
@@ -417,7 +425,7 @@ def get_user_challenges(current_user: str = Depends(get_current_user)):
         print(f"ERROR: {e}")
         logger.error(f"Error in Get user challenges: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
-    
+
     
 @course_router.get("/user/wassumon")
 def get_collected_breadmons(current_user: str = Depends(get_current_user)):
