@@ -52,7 +52,7 @@ def fetch_data_from_db():
         connection = psycopg2.connect(**DB_CONFIG)
         query = """
             SELECT 
-                latitude, longitude, spot_name, embedding
+                id, latitude, longitude, spot_name, embedding
             FROM tourist_spot_entity;
         """
         df = pd.read_sql_query(query, connection)
@@ -135,6 +135,7 @@ def explore_and_find_optimal(env, num_episodes=50):
     return list(dict.fromkeys(best_route))[:28]  # 중복 제거 및 28개로 제한
 
 # 최적 경로 API 엔드포인트
+# 최적 경로 API 엔드포인트
 @marble_router.post("/api/optimal-route")
 def get_optimal_route(user_input: UserInput):
     # DB에서 데이터 가져오기
@@ -159,6 +160,12 @@ def get_optimal_route(user_input: UserInput):
     # 탐험 및 최적 경로 탐색
     optimal_route = explore_and_find_optimal(env, num_episodes=50)
 
-    # 최적 경로의 장소 이름 반환
-    optimal_places = [{"spot_name": df.iloc[idx]["spot_name"]} for idx in optimal_route]
+    # 최적 경로의 장소 이름 및 ID 반환
+    optimal_places = [
+        {
+            "spot_id": int(df.iloc[idx]["id"]),
+            "spot_name": df.iloc[idx]["spot_name"]
+        }
+        for idx in optimal_route
+    ]
     return {"optimal_route": optimal_places}
