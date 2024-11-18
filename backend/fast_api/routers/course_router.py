@@ -68,7 +68,7 @@ def start_course(course_id: int, current_user: str = Depends(get_current_user)):
 
     # user_course_progress 테이블에 "start" 상태 추가
     start_query = """
-        INSERT INTO user_course_progress_entity (user_id, tour_course_id, progress)
+        INSERT INTO user_course_progress (user_id, tour_course_id, progress)
         VALUES (%s, %s, 'start')
         ON CONFLICT (user_id, tour_course_id) 
         DO UPDATE SET progress = 'start'
@@ -234,7 +234,7 @@ def get_course_details(course_id: int, current_user: str = Depends(get_current_u
         # 코스 상태 가져오기
         progress_query = """
             SELECT progress
-            FROM user_course_progress_entity
+            FROM user_course_progress
             WHERE user_id = %s AND tour_course_id = %s
         """
         progress_data = fetch_data(progress_query, params=[user_id, course_id])
@@ -302,7 +302,7 @@ def visit_spot(course_id: int, spot_id: int, current_user: str = Depends(get_cur
     # 진행 상태 업데이트
     progress_status = "complete" if is_completed else "start"
     progress_query = """
-        INSERT INTO user_course_progress_entity (user_id, tour_course_id, progress)
+        INSERT INTO user_course_progress (user_id, tour_course_id, progress)
         VALUES (%s, %s, %s)
         ON CONFLICT (user_id, tour_course_id)
         DO UPDATE SET progress = EXCLUDED.progress
@@ -331,7 +331,7 @@ def get_user_challenges(current_user: str = Depends(get_current_user)):
         # 진행 중 및 완료된 코스 정보 가져오기
         challenges_query = """
             SELECT tc.id AS course_id, tc.course_name, tc.description, tc.image_url, ucp.progress
-            FROM user_course_progress_entity AS ucp
+            FROM user_course_progress AS ucp
             JOIN tour_course AS tc
             ON ucp.tour_course_id = tc.id
             WHERE ucp.user_id = %s
