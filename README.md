@@ -75,7 +75,7 @@
 
 **Language |** HTML5, CSS3, JavaScript, node.js
 
-**Framework |** Next.js, Zustand
+**Framework |** Next.js, Zustand, React Native
 
 **Library |** eslint, prettier, Axios,
 
